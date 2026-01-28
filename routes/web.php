@@ -4,8 +4,8 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return view('welcome');
-});
+    return Inertia::render('Welcome');
+})->name('home');
 
 // Онбординг чат (MVP версия без auth - используется ручной ввод user_id)
 Route::get('/onboarding', function () {

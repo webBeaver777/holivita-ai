@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Exceptions\AIClientException;
+use App\Http\Controllers\Concerns\JsonResponses;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Onboarding\CancelRequest;
 use App\Http\Requests\Onboarding\ChatRequest;
 use App\Http\Requests\Onboarding\CompleteRequest;
 use App\Http\Requests\Onboarding\HistoryRequest;
@@ -18,6 +20,8 @@ use Illuminate\Http\JsonResponse;
  */
 final class OnboardingChatController extends Controller
 {
+    use JsonResponses;
+
     public function __construct(
         private readonly OnboardingService $onboardingService,
     ) {}
@@ -31,17 +35,14 @@ final class OnboardingChatController extends Controller
         $result = $this->onboardingService->canStartOnboarding($userId);
 
         if (! $result['can_start']) {
-            return response()->json([
-                'success' => false,
-                'message' => $result['reason'],
-            ], 409);
+            return $this->conflict($result['reason'], [
+                'active_session_id' => $result['active_session_id'],
+            ]);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User ID валиден',
+        return $this->success([
             'user_id' => $userId,
-        ]);
+        ], 'User ID валиден');
     }
 
     /**
@@ -56,19 +57,13 @@ final class OnboardingChatController extends Controller
                 ? $this->onboardingService->startOnboarding($session)
                 : $this->onboardingService->processMessage($session, $request->getMessage());
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'message' => $response->message,
-                    'completed' => $response->isComplete,
-                    'session_id' => $session->id,
-                ],
+            return $this->success([
+                'message' => $response->message,
+                'completed' => $response->isComplete,
+                'session_id' => $session->id,
             ]);
         } catch (AIClientException) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Не удалось получить ответ от ассистента. Попробуйте позже.',
-            ], 503);
+            return $this->serviceUnavailable('Не удалось получить ответ от ассистента. Попробуйте позже.');
         }
     }
 
@@ -83,28 +78,43 @@ final class OnboardingChatController extends Controller
         );
 
         if (! $session) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Сессия не найдена.',
-            ], 404);
+            return $this->notFound('Сессия не найдена.');
         }
 
         try {
             $response = $this->onboardingService->completeOnboarding($session);
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'summary' => $response->summary,
-                    'session_id' => $session->id,
-                ],
+            return $this->success([
+                'summary' => $response->summary,
+                'session_id' => $session->id,
             ]);
         } catch (AIClientException) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Не удалось создать суммаризацию. Попробуйте позже.',
-            ], 503);
+            return $this->serviceUnavailable('Не удалось создать суммаризацию. Попробуйте позже.');
         }
+    }
+
+    /**
+     * POST /api/onboarding/cancel
+     */
+    public function cancel(CancelRequest $request): JsonResponse
+    {
+        $session = $request->getSessionId()
+            ? $this->onboardingService->findSession($request->getSessionId(), $request->getUserId())
+            : $this->onboardingService->getActiveSession($request->getUserId());
+
+        if (! $session) {
+            return $this->notFound('Активная сессия не найдена.');
+        }
+
+        if (! $session->isActive()) {
+            return $this->conflict('Сессия уже завершена.');
+        }
+
+        $this->onboardingService->cancelSession($session);
+
+        return $this->success([
+            'session_id' => $session->id,
+        ], 'Сессия отменена.');
     }
 
     /**
@@ -115,23 +125,17 @@ final class OnboardingChatController extends Controller
         $session = $this->onboardingService->getLatestSession($request->getUserId());
 
         if (! $session) {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'messages' => [],
-                    'session_id' => null,
-                    'is_completed' => false,
-                ],
+            return $this->success([
+                'messages' => [],
+                'session_id' => null,
+                'is_completed' => false,
             ]);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'messages' => $this->onboardingService->getConversationHistory($session),
-                'session_id' => $session->id,
-                'is_completed' => $session->isCompleted(),
-            ],
+        return $this->success([
+            'messages' => $this->onboardingService->getConversationHistory($session),
+            'session_id' => $session->id,
+            'is_completed' => $session->isCompleted(),
         ]);
     }
 }

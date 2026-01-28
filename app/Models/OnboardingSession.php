@@ -58,6 +58,21 @@ class OnboardingSession extends Model
         return $this->status === OnboardingStatus::COMPLETED;
     }
 
+    public function isCancelled(): bool
+    {
+        return $this->status === OnboardingStatus::CANCELLED;
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->status === OnboardingStatus::EXPIRED;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status->isActive();
+    }
+
     /**
      * @param  array<string, mixed>  $summary
      */
@@ -66,6 +81,22 @@ class OnboardingSession extends Model
         $this->update([
             'status' => OnboardingStatus::COMPLETED,
             'summary_json' => $summary,
+            'completed_at' => now(),
+        ]);
+    }
+
+    public function markAsCancelled(): void
+    {
+        $this->update([
+            'status' => OnboardingStatus::CANCELLED,
+            'completed_at' => now(),
+        ]);
+    }
+
+    public function markAsExpired(): void
+    {
+        $this->update([
+            'status' => OnboardingStatus::EXPIRED,
             'completed_at' => now(),
         ]);
     }
@@ -83,5 +114,21 @@ class OnboardingSession extends Model
     public function scopeCompleted(Builder $query): Builder
     {
         return $query->where('status', OnboardingStatus::COMPLETED);
+    }
+
+    public function scopeCancelled(Builder $query): Builder
+    {
+        return $query->where('status', OnboardingStatus::CANCELLED);
+    }
+
+    public function scopeExpired(Builder $query): Builder
+    {
+        return $query->where('status', OnboardingStatus::EXPIRED);
+    }
+
+    public function scopeStale(Builder $query, int $hours = 24): Builder
+    {
+        return $query->inProgress()
+            ->where('updated_at', '<', now()->subHours($hours));
     }
 }

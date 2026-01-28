@@ -45,6 +45,7 @@ return [
         'queue' => env('ONBOARDING_QUEUE', 'onboarding'),
         'job_tries' => (int) env('ONBOARDING_JOB_TRIES', 3),
         'job_backoff' => (int) env('ONBOARDING_JOB_BACKOFF', 10),
+        'session_expiry_hours' => (int) env('ONBOARDING_SESSION_EXPIRY_HOURS', 24),
     ],
 
 ];

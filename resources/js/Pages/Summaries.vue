@@ -54,10 +54,10 @@
             });
 
             if (response.data.success) {
-                summaries.value = response.data.data.data;
-                currentPage.value = response.data.meta.current_page;
-                lastPage.value = response.data.meta.last_page;
-                total.value = response.data.meta.total;
+                summaries.value = response.data.data.items;
+                currentPage.value = response.data.data.pagination.current_page;
+                lastPage.value = response.data.data.pagination.last_page;
+                total.value = response.data.data.pagination.total;
             }
         } catch (err) {
             console.error('Load summaries error:', err);

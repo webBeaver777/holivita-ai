@@ -43,7 +43,10 @@ class OnboardingChatControllerTest extends TestCase
         $response->assertOk()
             ->assertJson([
                 'success' => true,
-                'user_id' => 123,
+                'message' => 'User ID валиден',
+                'data' => [
+                    'user_id' => 123,
+                ],
             ]);
     }
 
@@ -56,7 +59,7 @@ class OnboardingChatControllerTest extends TestCase
 
     public function test_validate_user_fails_with_active_session(): void
     {
-        OnboardingSession::create(['user_id' => 123]);
+        $session = OnboardingSession::create(['user_id' => 123]);
 
         $response = $this->postJson('/api/onboarding/validate-user', [
             'user_id' => 123,
@@ -65,6 +68,7 @@ class OnboardingChatControllerTest extends TestCase
         $response->assertStatus(409)
             ->assertJson([
                 'success' => false,
+                'active_session_id' => $session->id,
             ]);
     }
 
@@ -214,5 +218,98 @@ class OnboardingChatControllerTest extends TestCase
 
         $response->assertOk()
             ->assertJson(['success' => true]);
+    }
+
+    public function test_cancel_active_session(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+
+        $response = $this->postJson('/api/onboarding/cancel', [
+            'user_id' => 123,
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'message' => 'Сессия отменена.',
+                'data' => [
+                    'session_id' => $session->id,
+                ],
+            ]);
+
+        $this->assertTrue($session->fresh()->isCancelled());
+    }
+
+    public function test_cancel_specific_session(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+
+        $response = $this->postJson('/api/onboarding/cancel', [
+            'user_id' => 123,
+            'session_id' => $session->id,
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertTrue($session->fresh()->isCancelled());
+    }
+
+    public function test_cancel_fails_for_no_active_session(): void
+    {
+        $response = $this->postJson('/api/onboarding/cancel', [
+            'user_id' => 123,
+        ]);
+
+        $response->assertNotFound()
+            ->assertJson([
+                'success' => false,
+                'error' => 'Активная сессия не найдена.',
+            ]);
+    }
+
+    public function test_cancel_fails_for_already_completed_session(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+        $session->markAsCompleted(['test' => 'data']);
+
+        $response = $this->postJson('/api/onboarding/cancel', [
+            'user_id' => 123,
+            'session_id' => $session->id,
+        ]);
+
+        $response->assertStatus(409)
+            ->assertJson([
+                'success' => false,
+                'error' => 'Сессия уже завершена.',
+            ]);
+    }
+
+    public function test_user_can_start_new_session_after_cancelling(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+        $session->markAsCancelled();
+
+        $response = $this->postJson('/api/onboarding/validate-user', [
+            'user_id' => 123,
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+    }
+
+    public function test_stale_sessions_are_auto_expired(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+        OnboardingSession::where('id', $session->id)->update(['updated_at' => now()->subHours(25)]);
+
+        $response = $this->postJson('/api/onboarding/validate-user', [
+            'user_id' => 123,
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertTrue($session->fresh()->isExpired());
     }
 }

@@ -30,18 +30,68 @@ final class OnboardingService
     /**
      * Проверить возможность начала онбординга.
      *
-     * @return array{can_start: bool, reason: string|null}
+     * @return array{can_start: bool, reason: string|null, active_session_id: string|null}
      */
     public function canStartOnboarding(int $userId): array
     {
-        if (OnboardingSession::forUser($userId)->inProgress()->exists()) {
+        // Автоистечение старых сессий
+        $this->expireStaleSessionsForUser($userId);
+
+        $activeSession = $this->getActiveSession($userId);
+
+        if ($activeSession) {
             return [
                 'can_start' => false,
                 'reason' => 'У вас уже есть активная сессия онбординга.',
+                'active_session_id' => $activeSession->id,
             ];
         }
 
-        return ['can_start' => true, 'reason' => null];
+        return ['can_start' => true, 'reason' => null, 'active_session_id' => null];
+    }
+
+    /**
+     * Получить активную сессию пользователя.
+     */
+    public function getActiveSession(int $userId): ?OnboardingSession
+    {
+        return OnboardingSession::forUser($userId)
+            ->inProgress()
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * Отменить сессию.
+     */
+    public function cancelSession(OnboardingSession $session): void
+    {
+        if (! $session->isActive()) {
+            return;
+        }
+
+        $session->markAsCancelled();
+
+        Log::info('Cancelled onboarding session', ['session_id' => $session->id]);
+    }
+
+    /**
+     * Отметить устаревшие сессии пользователя как истёкшие.
+     */
+    public function expireStaleSessionsForUser(int $userId): int
+    {
+        $expiryHours = config('ai.onboarding.session_expiry_hours', 24);
+
+        $staleSessions = OnboardingSession::forUser($userId)
+            ->stale($expiryHours)
+            ->get();
+
+        foreach ($staleSessions as $session) {
+            $session->markAsExpired();
+            Log::info('Expired stale onboarding session', ['session_id' => $session->id]);
+        }
+
+        return $staleSessions->count();
     }
 
     /**

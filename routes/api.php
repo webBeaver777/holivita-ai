@@ -41,6 +41,10 @@ Route::prefix('onboarding')->group(function () {
     Route::post('/complete', [OnboardingChatController::class, 'complete'])
         ->name('onboarding.complete');
 
+    // Отмена сессии онбординга
+    Route::post('/cancel', [OnboardingChatController::class, 'cancel'])
+        ->name('onboarding.cancel');
+
     // Получение истории чата
     Route::get('/history', [OnboardingChatController::class, 'history'])
         ->name('onboarding.history');

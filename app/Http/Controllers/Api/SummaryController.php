@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\JsonResponses;
 use App\Http\Controllers\Controller;
 use App\Models\OnboardingSession;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,8 @@ use Illuminate\Http\Request;
  */
 final class SummaryController extends Controller
 {
+    use JsonResponses;
+
     /**
      * GET /api/summaries
      */
@@ -34,16 +37,15 @@ final class SummaryController extends Controller
 
         $sessions = $query->paginate($request->integer('per_page', 15));
 
-        return response()->json([
-            'success' => true,
-            'data' => $sessions->through(fn (OnboardingSession $session) => [
+        return $this->success([
+            'items' => $sessions->through(fn (OnboardingSession $session) => [
                 'id' => $session->id,
                 'user_id' => $session->user_id,
                 'summary' => $session->summary_json,
                 'completed_at' => $session->completed_at?->toISOString(),
                 'created_at' => $session->created_at?->toISOString(),
-            ]),
-            'meta' => [
+            ])->items(),
+            'pagination' => [
                 'current_page' => $sessions->currentPage(),
                 'last_page' => $sessions->lastPage(),
                 'per_page' => $sessions->perPage(),
@@ -62,21 +64,15 @@ final class SummaryController extends Controller
             ->first();
 
         if (! $session) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Суммаризация не найдена.',
-            ], 404);
+            return $this->notFound('Суммаризация не найдена.');
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'id' => $session->id,
-                'user_id' => $session->user_id,
-                'summary' => $session->summary_json,
-                'completed_at' => $session->completed_at?->toISOString(),
-                'created_at' => $session->created_at?->toISOString(),
-            ],
+        return $this->success([
+            'id' => $session->id,
+            'user_id' => $session->user_id,
+            'summary' => $session->summary_json,
+            'completed_at' => $session->completed_at?->toISOString(),
+            'created_at' => $session->created_at?->toISOString(),
         ]);
     }
 }

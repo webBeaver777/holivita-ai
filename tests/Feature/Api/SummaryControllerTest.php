@@ -20,7 +20,7 @@ class SummaryControllerTest extends TestCase
             ->assertJson([
                 'success' => true,
             ])
-            ->assertJsonCount(0, 'data.data');
+            ->assertJsonPath('data.items', []);
     }
 
     public function test_index_returns_completed_sessions_with_summary(): void
@@ -31,9 +31,9 @@ class SummaryControllerTest extends TestCase
         $response = $this->getJson('/api/summaries');
 
         $response->assertOk()
-            ->assertJsonCount(1, 'data.data')
-            ->assertJsonPath('data.data.0.user_id', 123)
-            ->assertJsonPath('data.data.0.summary.health', 'good');
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.user_id', 123)
+            ->assertJsonPath('data.items.0.summary.health', 'good');
     }
 
     public function test_index_excludes_incomplete_sessions(): void
@@ -43,7 +43,7 @@ class SummaryControllerTest extends TestCase
         $response = $this->getJson('/api/summaries');
 
         $response->assertOk()
-            ->assertJsonCount(0, 'data.data');
+            ->assertJsonCount(0, 'data.items');
     }
 
     public function test_index_filters_by_user_id(): void
@@ -57,8 +57,8 @@ class SummaryControllerTest extends TestCase
         $response = $this->getJson('/api/summaries?user_id=123');
 
         $response->assertOk()
-            ->assertJsonCount(1, 'data.data')
-            ->assertJsonPath('data.data.0.user_id', 123);
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.user_id', 123);
     }
 
     public function test_index_paginates_results(): void
@@ -71,9 +71,9 @@ class SummaryControllerTest extends TestCase
         $response = $this->getJson('/api/summaries?per_page=5');
 
         $response->assertOk()
-            ->assertJsonCount(5, 'data.data')
-            ->assertJsonPath('meta.per_page', 5)
-            ->assertJsonPath('meta.total', 20);
+            ->assertJsonCount(5, 'data.items')
+            ->assertJsonPath('data.pagination.per_page', 5)
+            ->assertJsonPath('data.pagination.total', 20);
     }
 
     public function test_show_returns_session_summary(): void

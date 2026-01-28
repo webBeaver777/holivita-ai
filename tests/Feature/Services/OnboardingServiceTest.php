@@ -237,4 +237,88 @@ class OnboardingServiceTest extends TestCase
 
         $this->assertTrue($this->service->hasProcessingMessages($session));
     }
+
+    public function test_get_active_session(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+
+        $active = $this->service->getActiveSession(123);
+
+        $this->assertEquals($session->id, $active->id);
+    }
+
+    public function test_get_active_session_returns_null_for_completed(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+        $session->markAsCompleted(['test' => 'data']);
+
+        $active = $this->service->getActiveSession(123);
+
+        $this->assertNull($active);
+    }
+
+    public function test_cancel_session(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+
+        $this->service->cancelSession($session);
+
+        $this->assertTrue($session->fresh()->isCancelled());
+    }
+
+    public function test_cancel_session_does_nothing_for_completed(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+        $session->markAsCompleted(['test' => 'data']);
+
+        $this->service->cancelSession($session);
+
+        $this->assertTrue($session->fresh()->isCompleted());
+        $this->assertFalse($session->fresh()->isCancelled());
+    }
+
+    public function test_expire_stale_sessions_for_user(): void
+    {
+        $staleSession = OnboardingSession::create(['user_id' => 123]);
+        OnboardingSession::where('id', $staleSession->id)->update(['updated_at' => now()->subHours(25)]);
+
+        $activeSession = OnboardingSession::create(['user_id' => 123]);
+
+        $expiredCount = $this->service->expireStaleSessionsForUser(123);
+
+        $this->assertEquals(1, $expiredCount);
+        $this->assertTrue($staleSession->fresh()->isExpired());
+        $this->assertTrue($activeSession->fresh()->isActive());
+    }
+
+    public function test_can_start_onboarding_returns_active_session_id(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+
+        $result = $this->service->canStartOnboarding(123);
+
+        $this->assertFalse($result['can_start']);
+        $this->assertEquals($session->id, $result['active_session_id']);
+    }
+
+    public function test_can_start_onboarding_after_cancelled(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 123]);
+        $session->markAsCancelled();
+
+        $result = $this->service->canStartOnboarding(123);
+
+        $this->assertTrue($result['can_start']);
+    }
+
+    public function test_can_start_onboarding_auto_expires_stale_sessions(): void
+    {
+        $staleSession = OnboardingSession::create(['user_id' => 123]);
+        OnboardingSession::where('id', $staleSession->id)->update(['updated_at' => now()->subHours(25)]);
+
+        $result = $this->service->canStartOnboarding(123);
+
+        $this->assertTrue($result['can_start']);
+        $this->assertTrue($staleSession->fresh()->isExpired());
+    }
 }

@@ -107,4 +107,74 @@ class OnboardingSessionTest extends TestCase
 
         $this->assertCount(1, $session->messages);
     }
+
+    public function test_is_cancelled(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 1]);
+
+        $this->assertFalse($session->isCancelled());
+
+        $session->markAsCancelled();
+
+        $this->assertTrue($session->fresh()->isCancelled());
+    }
+
+    public function test_is_expired(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 1]);
+
+        $this->assertFalse($session->isExpired());
+
+        $session->markAsExpired();
+
+        $this->assertTrue($session->fresh()->isExpired());
+    }
+
+    public function test_is_active(): void
+    {
+        $session = OnboardingSession::create(['user_id' => 1]);
+
+        $this->assertTrue($session->isActive());
+
+        $session->markAsCompleted(['test' => 'data']);
+
+        $this->assertFalse($session->fresh()->isActive());
+    }
+
+    public function test_scope_cancelled(): void
+    {
+        OnboardingSession::create(['user_id' => 1]);
+        $cancelled = OnboardingSession::create(['user_id' => 2]);
+        $cancelled->markAsCancelled();
+
+        $sessions = OnboardingSession::cancelled()->get();
+
+        $this->assertCount(1, $sessions);
+        $this->assertEquals($cancelled->id, $sessions->first()->id);
+    }
+
+    public function test_scope_expired(): void
+    {
+        OnboardingSession::create(['user_id' => 1]);
+        $expired = OnboardingSession::create(['user_id' => 2]);
+        $expired->markAsExpired();
+
+        $sessions = OnboardingSession::expired()->get();
+
+        $this->assertCount(1, $sessions);
+        $this->assertEquals($expired->id, $sessions->first()->id);
+    }
+
+    public function test_scope_stale(): void
+    {
+        OnboardingSession::create(['user_id' => 1]);
+
+        $stale = OnboardingSession::create(['user_id' => 2]);
+        OnboardingSession::where('id', $stale->id)->update(['updated_at' => now()->subHours(25)]);
+
+        $staleSessions = OnboardingSession::stale(24)->get();
+
+        $this->assertCount(1, $staleSessions);
+        $this->assertEquals($stale->id, $staleSessions->first()->id);
+    }
 }
