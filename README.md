@@ -6,7 +6,7 @@
 
 [![Laravel](https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3.5-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org)
-[![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
+[![PHP](https://img.shields.io/badge/PHP-8.4+-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
 
 [Возможности](#-возможности) •
@@ -50,7 +50,7 @@
 
 ### Требования
 
-- **PHP** 8.2+
+- **PHP** 8.4+
 - **Composer** 2.x
 - **Node.js** 18+ и npm/pnpm
 - **MySQL** 8.0+ или **SQLite**
@@ -61,7 +61,7 @@
 #### 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/your-username/holivita-ai.git
+git clone https://github.com/webBeaver777/holivita-ai.git
 cd holivita-ai
 ```
 
@@ -544,10 +544,10 @@ tests/
 </td>
 <td align="center" width="100">
 <img src="https://www.php.net/images/logos/php-logo.svg" width="48" height="48" alt="PHP" />
-<br><b>PHP 8.2</b>
+<br><b>PHP 8.4</b>
 </td>
 <td align="center" width="100">
-<img src="https://tailwindcss.com/_next/static/media/tailwindcss-mark.3c5441fc7a190e907c2c.svg" width="48" height="48" alt="Tailwind" />
+<img src="https://raw.githubusercontent.com/tailwindlabs/tailwindcss/HEAD/.github/logo-dark.svg" width="48" height="48" alt="Tailwind" />
 <br><b>Tailwind 4</b>
 </td>
 </tr>
