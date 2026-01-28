@@ -12,7 +12,7 @@ use App\Http\Requests\Onboarding\ChatRequest;
 use App\Http\Requests\Onboarding\CompleteRequest;
 use App\Http\Requests\Onboarding\HistoryRequest;
 use App\Http\Requests\Onboarding\ValidateUserRequest;
-use App\Services\Onboarding\OnboardingService;
+use App\Contracts\Onboarding\OnboardingServiceInterface;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -23,7 +23,7 @@ final class OnboardingChatController extends Controller
     use JsonResponses;
 
     public function __construct(
-        private readonly OnboardingService $onboardingService,
+        private readonly OnboardingServiceInterface $onboardingService,
     ) {}
 
     /**

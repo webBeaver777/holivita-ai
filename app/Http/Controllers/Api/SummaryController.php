@@ -6,9 +6,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\JsonResponses;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Summary\SummaryIndexRequest;
 use App\Models\OnboardingSession;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 /**
  * Контроллер для работы с суммаризациями.
@@ -20,22 +20,17 @@ final class SummaryController extends Controller
     /**
      * GET /api/summaries
      */
-    public function index(Request $request): JsonResponse
+    public function index(SummaryIndexRequest $request): JsonResponse
     {
-        $request->validate([
-            'user_id' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
-
         $query = OnboardingSession::completed()
             ->whereNotNull('summary_json')
             ->orderByDesc('completed_at');
 
-        if ($request->filled('user_id')) {
-            $query->forUser($request->integer('user_id'));
+        if ($request->getUserId() !== null) {
+            $query->forUser($request->getUserId());
         }
 
-        $sessions = $query->paginate($request->integer('per_page', 15));
+        $sessions = $query->paginate($request->getPerPage());
 
         return $this->success([
             'items' => $sessions->through(fn (OnboardingSession $session) => [

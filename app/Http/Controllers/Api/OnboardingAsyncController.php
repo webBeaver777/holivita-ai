@@ -9,7 +9,7 @@ use App\Http\Controllers\Concerns\JsonResponses;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Onboarding\ChatRequest;
 use App\Http\Requests\Onboarding\MessageStatusRequest;
-use App\Services\Onboarding\OnboardingService;
+use App\Contracts\Onboarding\OnboardingServiceInterface;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -20,7 +20,7 @@ final class OnboardingAsyncController extends Controller
     use JsonResponses;
 
     public function __construct(
-        private readonly OnboardingService $onboardingService,
+        private readonly OnboardingServiceInterface $onboardingService,
     ) {}
 
     /**

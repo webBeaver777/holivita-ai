@@ -36,9 +36,7 @@ final class ProcessOnboardingMessageJob implements ShouldQueue
         public readonly OnboardingMessage $userMessage,
         public readonly OnboardingSession $session,
     ) {
-        $this->tries = config('ai.onboarding.job_tries', 3);
-        $this->backoff = config('ai.onboarding.job_backoff', 10);
-        $this->onQueue($this->getQueueName());
+        $this->initializeJobConfig();
     }
 
     public function handle(AIClientInterface $aiClient): void

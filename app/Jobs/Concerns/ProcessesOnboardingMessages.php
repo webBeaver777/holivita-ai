@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Concerns;
 
+use App\DTOs\Onboarding\OnboardingConfig;
 use App\Enums\MessageRole;
 use App\Enums\MessageStatus;
 use App\Models\OnboardingMessage;
@@ -14,6 +15,22 @@ use App\Models\OnboardingSession;
  */
 trait ProcessesOnboardingMessages
 {
+    protected ?OnboardingConfig $onboardingConfig = null;
+
+    protected function getOnboardingConfig(): OnboardingConfig
+    {
+        return $this->onboardingConfig ??= OnboardingConfig::fromConfig();
+    }
+
+    protected function initializeJobConfig(): void
+    {
+        $config = $this->getOnboardingConfig();
+
+        $this->tries = $config->jobTries;
+        $this->backoff = $config->jobBackoff;
+        $this->onQueue($config->queue);
+    }
+
     protected function createPendingAssistantMessage(OnboardingSession $session): OnboardingMessage
     {
         return OnboardingMessage::create([
@@ -34,8 +51,8 @@ trait ProcessesOnboardingMessages
             ]);
     }
 
-    protected function getQueueName(): string
+    protected function getWelcomePrompt(): string
     {
-        return config('ai.onboarding.queue', 'onboarding');
+        return $this->getOnboardingConfig()->welcomePrompt;
     }
 }

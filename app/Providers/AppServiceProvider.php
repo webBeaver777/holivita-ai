@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Contracts\AI\AIClientInterface;
+use App\Contracts\Onboarding\OnboardingServiceInterface;
 use App\Services\AI\AnythingLLMClient;
+use App\Services\Onboarding\OnboardingService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -25,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
                 summaryWorkspaceSlug: $config['summary_workspace_slug'],
             );
         });
+
+        $this->app->singleton(OnboardingServiceInterface::class, OnboardingService::class);
     }
 
     /**

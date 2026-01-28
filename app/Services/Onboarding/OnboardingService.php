@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Services\Onboarding;
 
 use App\Contracts\AI\AIClientInterface;
+use App\Contracts\Onboarding\OnboardingServiceInterface;
 use App\DTOs\AI\ChatRequestDTO;
 use App\DTOs\AI\ChatResponseDTO;
 use App\DTOs\AI\SummarizeRequestDTO;
 use App\DTOs\AI\SummarizeResponseDTO;
+use App\DTOs\Onboarding\OnboardingConfig;
 use App\Enums\MessageRole;
 use App\Enums\MessageStatus;
 use App\Jobs\Onboarding\ProcessOnboardingMessageJob;
@@ -21,11 +23,16 @@ use Illuminate\Support\Facades\Log;
 /**
  * Сервис для управления онбордингом.
  */
-final class OnboardingService
+final class OnboardingService implements OnboardingServiceInterface
 {
+    private readonly OnboardingConfig $config;
+
     public function __construct(
         private readonly AIClientInterface $aiClient,
-    ) {}
+        ?OnboardingConfig $config = null,
+    ) {
+        $this->config = $config ?? OnboardingConfig::fromConfig();
+    }
 
     /**
      * Проверить возможность начала онбординга.
@@ -34,7 +41,6 @@ final class OnboardingService
      */
     public function canStartOnboarding(int $userId): array
     {
-        // Автоистечение старых сессий
         $this->expireStaleSessionsForUser($userId);
 
         $activeSession = $this->getActiveSession($userId);
@@ -80,10 +86,8 @@ final class OnboardingService
      */
     public function expireStaleSessionsForUser(int $userId): int
     {
-        $expiryHours = config('ai.onboarding.session_expiry_hours', 24);
-
         $staleSessions = OnboardingSession::forUser($userId)
-            ->stale($expiryHours)
+            ->stale($this->config->sessionExpiryHours)
             ->get();
 
         foreach ($staleSessions as $session) {
@@ -127,7 +131,7 @@ final class OnboardingService
     {
         return DB::transaction(function () use ($session) {
             $response = $this->aiClient->chat(new ChatRequestDTO(
-                message: config('ai.onboarding.welcome_prompt'),
+                message: $this->config->welcomePrompt,
                 sessionId: $session->id,
             ));
 
@@ -193,7 +197,7 @@ final class OnboardingService
     /**
      * Получить историю диалога.
      *
-     * @return array<array{role: string, content: string}>
+     * @return array<int, array{role: string, content: string}>
      */
     public function getConversationHistory(OnboardingSession $session): array
     {
@@ -287,6 +291,14 @@ final class OnboardingService
     public function hasProcessingMessages(OnboardingSession $session): bool
     {
         return $session->messages()->inProgress()->exists();
+    }
+
+    /**
+     * Получить конфигурацию онбординга.
+     */
+    public function getConfig(): OnboardingConfig
+    {
+        return $this->config;
     }
 
     private function saveMessage(OnboardingSession $session, MessageRole $role, string $content): void
