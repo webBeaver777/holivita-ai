@@ -10,7 +10,9 @@ use App\DTOs\AI\ChatResponseDTO;
 use App\DTOs\AI\SummarizeRequestDTO;
 use App\DTOs\AI\SummarizeResponseDTO;
 use App\Enums\MessageRole;
-use App\Enums\OnboardingStatus;
+use App\Enums\MessageStatus;
+use App\Jobs\Onboarding\ProcessOnboardingMessageJob;
+use App\Jobs\Onboarding\ProcessOnboardingStartJob;
 use App\Models\OnboardingMessage;
 use App\Models\OnboardingSession;
 use Illuminate\Support\Facades\DB;
@@ -21,40 +23,21 @@ use Illuminate\Support\Facades\Log;
  */
 final class OnboardingService
 {
-    private const WELCOME_PROMPT = 'Начни онбординг. Поприветствуй пользователя тепло и задай первый вопрос.';
-
     public function __construct(
         private readonly AIClientInterface $aiClient,
     ) {}
 
     /**
-     * Проверить возможность начала онбординга для пользователя.
+     * Проверить возможность начала онбординга.
      *
      * @return array{can_start: bool, reason: string|null}
      */
     public function canStartOnboarding(int $userId): array
     {
-        $activeSession = OnboardingSession::query()
-            ->where('user_id', $userId)
-            ->where('status', OnboardingStatus::IN_PROGRESS)
-            ->exists();
-
-        if ($activeSession) {
+        if (OnboardingSession::forUser($userId)->inProgress()->exists()) {
             return [
                 'can_start' => false,
                 'reason' => 'У вас уже есть активная сессия онбординга.',
-            ];
-        }
-
-        $completedSession = OnboardingSession::query()
-            ->where('user_id', $userId)
-            ->where('status', OnboardingStatus::COMPLETED)
-            ->exists();
-
-        if ($completedSession) {
-            return [
-                'can_start' => false,
-                'reason' => 'Вы уже прошли онбординг ранее.',
             ];
         }
 
@@ -62,45 +45,41 @@ final class OnboardingService
     }
 
     /**
-     * Получить или создать активную сессию для пользователя.
+     * Получить или создать активную сессию.
      */
     public function getOrCreateSession(int $userId): OnboardingSession
     {
-        $session = OnboardingSession::query()
-            ->where('user_id', $userId)
-            ->where('status', OnboardingStatus::IN_PROGRESS)
+        $session = OnboardingSession::forUser($userId)
+            ->inProgress()
             ->latest()
             ->first();
 
-        if (! $session) {
-            $session = OnboardingSession::create([
-                'user_id' => $userId,
-                'status' => OnboardingStatus::IN_PROGRESS,
-            ]);
-
-            Log::info('Created new onboarding session', [
-                'session_id' => $session->id,
-                'user_id' => $userId,
-            ]);
+        if ($session) {
+            return $session;
         }
+
+        $session = OnboardingSession::create(['user_id' => $userId]);
+
+        Log::info('Created new onboarding session', [
+            'session_id' => $session->id,
+            'user_id' => $userId,
+        ]);
 
         return $session;
     }
 
     /**
-     * Начать онбординг (получить приветственное сообщение).
+     * Начать онбординг (получить приветствие).
      *
      * @throws \App\Exceptions\AIClientException
      */
     public function startOnboarding(OnboardingSession $session): ChatResponseDTO
     {
         return DB::transaction(function () use ($session) {
-            $request = new ChatRequestDTO(
-                message: self::WELCOME_PROMPT,
+            $response = $this->aiClient->chat(new ChatRequestDTO(
+                message: config('ai.onboarding.welcome_prompt'),
                 sessionId: $session->id,
-            );
-
-            $response = $this->aiClient->chat($request);
+            ));
 
             $this->saveMessage($session, MessageRole::ASSISTANT, $response->message);
 
@@ -120,13 +99,10 @@ final class OnboardingService
         return DB::transaction(function () use ($session, $message) {
             $this->saveMessage($session, MessageRole::USER, $message);
 
-            $request = new ChatRequestDTO(
+            $response = $this->aiClient->chat(new ChatRequestDTO(
                 message: $message,
-                conversationHistory: $this->getConversationHistory($session),
                 sessionId: $session->id,
-            );
-
-            $response = $this->aiClient->chat($request);
+            ));
 
             $this->saveMessage($session, MessageRole::ASSISTANT, $response->message);
 
@@ -147,33 +123,25 @@ final class OnboardingService
     public function completeOnboarding(OnboardingSession $session): SummarizeResponseDTO
     {
         if ($session->isCompleted()) {
-            return new SummarizeResponseDTO(
-                summary: $session->summary_json ?? [],
-            );
+            return new SummarizeResponseDTO(summary: $session->summary_json ?? []);
         }
 
         return DB::transaction(function () use ($session) {
-            $messages = $this->getConversationHistory($session);
-
-            $request = new SummarizeRequestDTO(
-                messages: $messages,
+            $response = $this->aiClient->summarize(new SummarizeRequestDTO(
+                messages: $this->getConversationHistory($session),
                 sessionId: $session->id,
-            );
-
-            $response = $this->aiClient->summarize($request);
+            ));
 
             $session->markAsCompleted($response->summary);
 
-            Log::info('Completed onboarding session', [
-                'session_id' => $session->id,
-            ]);
+            Log::info('Completed onboarding session', ['session_id' => $session->id]);
 
             return $response;
         });
     }
 
     /**
-     * Получить историю диалога сессии.
+     * Получить историю диалога.
      *
      * @return array<array{role: string, content: string}>
      */
@@ -191,9 +159,8 @@ final class OnboardingService
      */
     public function findSession(string $sessionId, int $userId): ?OnboardingSession
     {
-        return OnboardingSession::query()
+        return OnboardingSession::forUser($userId)
             ->where('id', $sessionId)
-            ->where('user_id', $userId)
             ->first();
     }
 
@@ -202,15 +169,79 @@ final class OnboardingService
      */
     public function getLatestSession(int $userId): ?OnboardingSession
     {
-        return OnboardingSession::query()
-            ->where('user_id', $userId)
-            ->latest()
-            ->first();
+        return OnboardingSession::forUser($userId)->latest()->first();
     }
 
-    private function saveMessage(OnboardingSession $session, MessageRole $role, string $content): OnboardingMessage
+    /**
+     * Асинхронно начать онбординг (отправить в очередь).
+     */
+    public function startOnboardingAsync(OnboardingSession $session): void
     {
-        return OnboardingMessage::create([
+        ProcessOnboardingStartJob::dispatch($session);
+
+        Log::info('Dispatched onboarding start job', ['session_id' => $session->id]);
+    }
+
+    /**
+     * Асинхронно обработать сообщение пользователя (отправить в очередь).
+     */
+    public function processMessageAsync(OnboardingSession $session, string $message): OnboardingMessage
+    {
+        $userMessage = OnboardingMessage::create([
+            'session_id' => $session->id,
+            'role' => MessageRole::USER,
+            'content' => $message,
+            'status' => MessageStatus::PENDING,
+        ]);
+
+        ProcessOnboardingMessageJob::dispatch($userMessage, $session);
+
+        Log::info('Dispatched onboarding message job', [
+            'session_id' => $session->id,
+            'message_id' => $userMessage->id,
+        ]);
+
+        return $userMessage;
+    }
+
+    /**
+     * Получить статус обработки последнего сообщения.
+     *
+     * @return array{status: string, message: string|null, error: string|null}
+     */
+    public function getMessageStatus(OnboardingSession $session): array
+    {
+        $lastAssistantMessage = $session->messages()
+            ->assistant()
+            ->latest('id')
+            ->first();
+
+        if (! $lastAssistantMessage) {
+            return [
+                'status' => MessageStatus::PENDING->value,
+                'message' => null,
+                'error' => null,
+            ];
+        }
+
+        return [
+            'status' => $lastAssistantMessage->status->value,
+            'message' => $lastAssistantMessage->isCompleted() ? $lastAssistantMessage->content : null,
+            'error' => $lastAssistantMessage->isFailed() ? $lastAssistantMessage->error_message : null,
+        ];
+    }
+
+    /**
+     * Проверить, есть ли сообщения в обработке.
+     */
+    public function hasProcessingMessages(OnboardingSession $session): bool
+    {
+        return $session->messages()->inProgress()->exists();
+    }
+
+    private function saveMessage(OnboardingSession $session, MessageRole $role, string $content): void
+    {
+        OnboardingMessage::create([
             'session_id' => $session->id,
             'role' => $role,
             'content' => $content,

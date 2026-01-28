@@ -7,7 +7,7 @@ namespace App\DTOs\AI;
 /**
  * DTO для запроса суммаризации.
  */
-readonly class SummarizeRequestDTO
+final readonly class SummarizeRequestDTO
 {
     /**
      * @param  array<array{role: string, content: string}>  $messages  Сообщения для суммаризации

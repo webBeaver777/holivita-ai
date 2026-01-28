@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\OnboardingStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Carbon\Carbon|null $completed_at
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
+ *
+ * @method static Builder|OnboardingSession forUser(int $userId)
+ * @method static Builder|OnboardingSession inProgress()
+ * @method static Builder|OnboardingSession completed()
  */
 class OnboardingSession extends Model
 {
@@ -43,25 +48,17 @@ class OnboardingSession extends Model
         'status' => OnboardingStatus::IN_PROGRESS,
     ];
 
-    /**
-     * Связь с сообщениями.
-     */
     public function messages(): HasMany
     {
         return $this->hasMany(OnboardingMessage::class, 'session_id');
     }
 
-    /**
-     * Проверить, завершён ли онбординг.
-     */
     public function isCompleted(): bool
     {
         return $this->status === OnboardingStatus::COMPLETED;
     }
 
     /**
-     * Пометить как завершённый.
-     *
      * @param  array<string, mixed>  $summary
      */
     public function markAsCompleted(array $summary): void
@@ -73,18 +70,17 @@ class OnboardingSession extends Model
         ]);
     }
 
-    /**
-     * Scope для активных сессий.
-     */
-    public function scopeInProgress($query)
+    public function scopeForUser(Builder $query, int $userId): Builder
+    {
+        return $query->where('user_id', $userId);
+    }
+
+    public function scopeInProgress(Builder $query): Builder
     {
         return $query->where('status', OnboardingStatus::IN_PROGRESS);
     }
 
-    /**
-     * Scope для завершённых сессий.
-     */
-    public function scopeCompleted($query)
+    public function scopeCompleted(Builder $query): Builder
     {
         return $query->where('status', OnboardingStatus::COMPLETED);
     }

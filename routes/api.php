@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\OnboardingAsyncController;
 use App\Http\Controllers\Api\OnboardingChatController;
 use App\Http\Controllers\Api\SummaryController;
 use Illuminate\Support\Facades\Route;
@@ -21,9 +22,20 @@ Route::prefix('onboarding')->group(function () {
     Route::post('/validate-user', [OnboardingChatController::class, 'validateUser'])
         ->name('onboarding.validate-user');
 
-    // Отправка сообщения в чат
+    // Синхронная отправка сообщения в чат
     Route::post('/chat', [OnboardingChatController::class, 'chat'])
         ->name('onboarding.chat');
+
+    // Асинхронные эндпоинты (через очередь)
+    Route::prefix('async')->group(function () {
+        // Отправка сообщения в очередь
+        Route::post('/chat', [OnboardingAsyncController::class, 'chat'])
+            ->name('onboarding.async.chat');
+
+        // Проверка статуса обработки
+        Route::get('/status', [OnboardingAsyncController::class, 'status'])
+            ->name('onboarding.async.status');
+    });
 
     // Завершение онбординга и суммаризация
     Route::post('/complete', [OnboardingChatController::class, 'complete'])

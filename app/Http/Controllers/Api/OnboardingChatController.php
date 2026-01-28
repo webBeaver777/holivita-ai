@@ -8,11 +8,10 @@ use App\Exceptions\AIClientException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Onboarding\ChatRequest;
 use App\Http\Requests\Onboarding\CompleteRequest;
+use App\Http\Requests\Onboarding\HistoryRequest;
 use App\Http\Requests\Onboarding\ValidateUserRequest;
 use App\Services\Onboarding\OnboardingService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Контроллер API для онбординг-чата.
@@ -24,21 +23,18 @@ final class OnboardingChatController extends Controller
     ) {}
 
     /**
-     * Валидация user_id перед началом онбординга.
-     *
      * POST /api/onboarding/validate-user
      */
     public function validateUser(ValidateUserRequest $request): JsonResponse
     {
         $userId = $request->getUserId();
-
         $result = $this->onboardingService->canStartOnboarding($userId);
 
         if (! $result['can_start']) {
             return response()->json([
                 'success' => false,
                 'message' => $result['reason'],
-            ], Response::HTTP_CONFLICT);
+            ], 409);
         }
 
         return response()->json([
@@ -49,21 +45,16 @@ final class OnboardingChatController extends Controller
     }
 
     /**
-     * Отправить сообщение в чат.
-     *
      * POST /api/onboarding/chat
      */
     public function chat(ChatRequest $request): JsonResponse
     {
-        $userId = $request->getUserId();
-        $message = $request->getMessage();
-
         try {
-            $session = $this->onboardingService->getOrCreateSession($userId);
+            $session = $this->onboardingService->getOrCreateSession($request->getUserId());
 
-            $response = empty($message)
+            $response = empty($request->getMessage())
                 ? $this->onboardingService->startOnboarding($session)
-                : $this->onboardingService->processMessage($session, $message);
+                : $this->onboardingService->processMessage($session, $request->getMessage());
 
             return response()->json([
                 'success' => true,
@@ -73,17 +64,15 @@ final class OnboardingChatController extends Controller
                     'session_id' => $session->id,
                 ],
             ]);
-        } catch (AIClientException $e) {
+        } catch (AIClientException) {
             return response()->json([
                 'success' => false,
                 'error' => 'Не удалось получить ответ от ассистента. Попробуйте позже.',
-            ], Response::HTTP_SERVICE_UNAVAILABLE);
+            ], 503);
         }
     }
 
     /**
-     * Завершить онбординг и получить суммаризацию.
-     *
      * POST /api/onboarding/complete
      */
     public function complete(CompleteRequest $request): JsonResponse
@@ -97,7 +86,7 @@ final class OnboardingChatController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => 'Сессия не найдена.',
-            ], Response::HTTP_NOT_FOUND);
+            ], 404);
         }
 
         try {
@@ -110,27 +99,20 @@ final class OnboardingChatController extends Controller
                     'session_id' => $session->id,
                 ],
             ]);
-        } catch (AIClientException $e) {
+        } catch (AIClientException) {
             return response()->json([
                 'success' => false,
                 'error' => 'Не удалось создать суммаризацию. Попробуйте позже.',
-            ], Response::HTTP_SERVICE_UNAVAILABLE);
+            ], 503);
         }
     }
 
     /**
-     * Получить историю чата сессии.
-     *
      * GET /api/onboarding/history
      */
-    public function history(Request $request): JsonResponse
+    public function history(HistoryRequest $request): JsonResponse
     {
-        $request->validate([
-            'user_id' => ['required', 'integer', 'min:1'],
-        ]);
-
-        $userId = (int) $request->input('user_id');
-        $session = $this->onboardingService->getLatestSession($userId);
+        $session = $this->onboardingService->getLatestSession($request->getUserId());
 
         if (! $session) {
             return response()->json([

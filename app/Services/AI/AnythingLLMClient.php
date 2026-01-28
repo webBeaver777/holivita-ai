@@ -71,11 +71,9 @@ final class AnythingLLMClient implements AIClientInterface
         );
 
         $rawResponse = $this->extractMessage($response);
-        $summary = $this->parseJson($rawResponse);
 
         return new SummarizeResponseDTO(
-            summary: $summary,
-            rawResponse: $rawResponse,
+            summary: $this->parseJson($rawResponse),
         );
     }
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\OnboardingStatus;
 use App\Http\Controllers\Controller;
 use App\Models\OnboardingSession;
 use Illuminate\Http\JsonResponse;
@@ -16,8 +15,6 @@ use Illuminate\Http\Request;
 final class SummaryController extends Controller
 {
     /**
-     * Получить список суммаризаций с пагинацией и поиском.
-     *
      * GET /api/summaries
      */
     public function index(Request $request): JsonResponse
@@ -27,17 +24,15 @@ final class SummaryController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = OnboardingSession::query()
-            ->where('status', OnboardingStatus::COMPLETED)
+        $query = OnboardingSession::completed()
             ->whereNotNull('summary_json')
             ->orderByDesc('completed_at');
 
         if ($request->filled('user_id')) {
-            $query->where('user_id', $request->integer('user_id'));
+            $query->forUser($request->integer('user_id'));
         }
 
-        $perPage = $request->integer('per_page', 15);
-        $sessions = $query->paginate($perPage);
+        $sessions = $query->paginate($request->integer('per_page', 15));
 
         return response()->json([
             'success' => true,
@@ -58,15 +53,12 @@ final class SummaryController extends Controller
     }
 
     /**
-     * Получить суммаризацию по ID сессии.
-     *
      * GET /api/summaries/{sessionId}
      */
     public function show(string $sessionId): JsonResponse
     {
-        $session = OnboardingSession::query()
+        $session = OnboardingSession::completed()
             ->where('id', $sessionId)
-            ->where('status', OnboardingStatus::COMPLETED)
             ->first();
 
         if (! $session) {

@@ -7,24 +7,12 @@ namespace App\DTOs\AI;
 /**
  * DTO для ответа суммаризации.
  */
-readonly class SummarizeResponseDTO
+final readonly class SummarizeResponseDTO
 {
     /**
-     * @param  array<string, mixed>  $summary  Структурированная суммаризация
-     * @param  string  $rawResponse  Сырой ответ от AI
+     * @param  array<string, mixed>  $summary
      */
     public function __construct(
         public array $summary,
-        public string $rawResponse = '',
     ) {}
-
-    /**
-     * Преобразовать в массив.
-     *
-     * @return array<string, mixed>
-     */
-    public function toArray(): array
-    {
-        return $this->summary;
-    }
 }

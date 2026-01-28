@@ -31,4 +31,20 @@ return [
 
     'default_provider' => env('AI_PROVIDER', 'anythingllm'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Onboarding Settings
+    |--------------------------------------------------------------------------
+    */
+
+    'onboarding' => [
+        'welcome_prompt' => env(
+            'ONBOARDING_WELCOME_PROMPT',
+            'Начни онбординг. Поприветствуй пользователя тепло и задай первый вопрос.'
+        ),
+        'queue' => env('ONBOARDING_QUEUE', 'onboarding'),
+        'job_tries' => (int) env('ONBOARDING_JOB_TRIES', 3),
+        'job_backoff' => (int) env('ONBOARDING_JOB_BACKOFF', 10),
+    ],
+
 ];
