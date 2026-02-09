@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Onboarding\OnboardingServiceInterface;
 use App\Exceptions\AIClientException;
 use App\Http\Controllers\Concerns\JsonResponses;
 use App\Http\Controllers\Controller;
@@ -12,7 +13,6 @@ use App\Http\Requests\Onboarding\ChatRequest;
 use App\Http\Requests\Onboarding\CompleteRequest;
 use App\Http\Requests\Onboarding\HistoryRequest;
 use App\Http\Requests\Onboarding\ValidateUserRequest;
-use App\Contracts\Onboarding\OnboardingServiceInterface;
 use Illuminate\Http\JsonResponse;
 
 /**

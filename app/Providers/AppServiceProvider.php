@@ -8,6 +8,8 @@ use App\Contracts\AI\AIClientInterface;
 use App\Contracts\Onboarding\OnboardingServiceInterface;
 use App\Services\AI\AnythingLLMClient;
 use App\Services\Onboarding\OnboardingService;
+use App\Services\Voice\VoiceClientFactory;
+use App\Services\Voice\VoiceTranscriptionService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -29,6 +31,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(OnboardingServiceInterface::class, OnboardingService::class);
+
+        $this->app->singleton(VoiceTranscriptionService::class, function () {
+            return new VoiceTranscriptionService(new VoiceClientFactory);
+        });
     }
 
     /**

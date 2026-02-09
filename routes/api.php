@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\OnboardingAsyncController;
 use App\Http\Controllers\Api\OnboardingChatController;
 use App\Http\Controllers\Api\SummaryController;
+use App\Http\Controllers\Api\VoiceController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -57,4 +58,24 @@ Route::prefix('summaries')->group(function () {
 
     Route::get('/{sessionId}', [SummaryController::class, 'show'])
         ->name('summaries.show');
+});
+
+// Голосовой ввод (OpenAI Whisper)
+Route::prefix('voice')->group(function () {
+    // Синхронная транскрипция
+    Route::post('/transcribe', [VoiceController::class, 'transcribe'])
+        ->name('voice.transcribe');
+
+    // Статус сервиса
+    Route::get('/status', [VoiceController::class, 'status'])
+        ->name('voice.status');
+
+    // Асинхронные эндпоинты (через очередь)
+    Route::prefix('async')->group(function () {
+        Route::post('/transcribe', [VoiceController::class, 'transcribeAsync'])
+            ->name('voice.async.transcribe');
+
+        Route::get('/status', [VoiceController::class, 'transcriptionStatus'])
+            ->name('voice.async.status');
+    });
 });

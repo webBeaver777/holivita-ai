@@ -38,6 +38,7 @@
 | Функция | Описание |
 |---------|----------|
 | **Онбординг чат** | Интерактивный диалог с AI для сбора данных о здоровье |
+| **Голосовой ввод** | Транскрипция речи в текст с поддержкой провайдеров |
 | **Синхронный режим** | Мгновенные ответы для быстрого взаимодействия |
 | **Асинхронный режим** | Обработка через очереди для масштабирования |
 | **Суммаризация** | Автоматическое создание структурированного профиля |
@@ -384,6 +385,93 @@ GET /api/summaries/{session_id}
 
 ---
 
+### Голосовой ввод
+
+#### Транскрипция аудио
+
+Преобразование аудио в текст.
+
+```http
+POST /api/voice/transcribe
+Content-Type: multipart/form-data
+
+audio: (файл) audio.webm
+user_id: 123
+language: ru (опционально)
+provider: anythingllm (опционально)
+session_id: uuid (опционально)
+```
+
+<details>
+<summary>Ответ</summary>
+
+```json
+{
+    "success": true,
+    "data": {
+        "text": "Распознанный текст",
+        "language": "ru",
+        "confidence": 0.95,
+        "duration": 2.5,
+        "provider": "anythingllm"
+    }
+}
+```
+
+</details>
+
+---
+
+#### Транскрипция с fallback
+
+Автоматическое переключение на резервного провайдера при ошибке.
+
+```http
+POST /api/voice/transcribe-fallback
+Content-Type: multipart/form-data
+
+audio: (файл) audio.webm
+user_id: 123
+```
+
+---
+
+#### Список провайдеров
+
+```http
+GET /api/voice/providers
+```
+
+<details>
+<summary>Ответ</summary>
+
+```json
+{
+    "success": true,
+    "data": {
+        "providers": {
+            "anythingllm": {
+                "name": "AnythingLLM",
+                "available": true,
+                "formats": ["audio/webm", "audio/wav", "audio/mp3"],
+                "max_size": 26214400
+            },
+            "openai": {
+                "name": "OpenAI Whisper",
+                "available": true,
+                "formats": ["audio/mp3", "audio/wav", "audio/webm"],
+                "max_size": 26214400
+            }
+        },
+        "default": "anythingllm"
+    }
+}
+```
+
+</details>
+
+---
+
 ## Архитектура
 
 ### Структура проекта
@@ -393,15 +481,21 @@ app/
 ├── Contracts/              # Интерфейсы
 │   ├── AI/
 │   │   └── AIClientInterface.php
-│   └── Onboarding/
-│       └── OnboardingServiceInterface.php
+│   ├── Onboarding/
+│   │   └── OnboardingServiceInterface.php
+│   └── Voice/
+│       └── VoiceTranscriptionInterface.php
 ├── DTOs/                   # Data Transfer Objects
 │   ├── AI/
 │   │   ├── ChatRequestDTO.php
 │   │   ├── ChatResponseDTO.php
 │   │   └── ...
-│   └── Onboarding/
-│       └── OnboardingConfig.php
+│   ├── Onboarding/
+│   │   └── OnboardingConfig.php
+│   └── Voice/
+│       ├── TranscriptionRequestDTO.php
+│       ├── TranscriptionResponseDTO.php
+│       └── VoiceConfig.php
 ├── Enums/                  # Перечисления
 │   ├── MessageRole.php
 │   ├── MessageStatus.php
@@ -410,7 +504,8 @@ app/
 │   ├── Controllers/Api/
 │   │   ├── OnboardingChatController.php
 │   │   ├── OnboardingAsyncController.php
-│   │   └── SummaryController.php
+│   │   ├── SummaryController.php
+│   │   └── VoiceController.php
 │   └── Requests/           # Form Requests
 ├── Jobs/                   # Queue Jobs
 │   ├── Concerns/
@@ -424,8 +519,13 @@ app/
 └── Services/
     ├── AI/
     │   └── AnythingLLMClient.php
-    └── Onboarding/
-        └── OnboardingService.php
+    ├── Onboarding/
+    │   └── OnboardingService.php
+    └── Voice/
+        ├── AnythingLLMVoiceClient.php
+        ├── OpenAIVoiceClient.php
+        ├── VoiceClientFactory.php
+        └── VoiceTranscriptionService.php
 ```
 
 ### Диаграмма потока
@@ -482,17 +582,27 @@ tests/
 │   ├── Api/
 │   │   ├── OnboardingChatControllerTest.php
 │   │   ├── OnboardingAsyncControllerTest.php
-│   │   └── SummaryControllerTest.php
+│   │   ├── SummaryControllerTest.php
+│   │   └── VoiceControllerTest.php
 │   ├── Jobs/
 │   │   └── ProcessOnboardingJobsTest.php
 │   └── Services/
 │       └── OnboardingServiceTest.php
 └── Unit/
+    ├── DTOs/
+    │   └── Voice/
+    │       └── TranscriptionDTOsTest.php
     ├── Enums/
     │   └── MessageStatusTest.php
-    └── Models/
-        ├── OnboardingMessageTest.php
-        └── OnboardingSessionTest.php
+    ├── Exceptions/
+    │   └── VoiceTranscriptionExceptionTest.php
+    ├── Models/
+    │   ├── OnboardingMessageTest.php
+    │   └── OnboardingSessionTest.php
+    └── Services/
+        └── Voice/
+            ├── VoiceClientFactoryTest.php
+            └── VoiceTranscriptionServiceTest.php
 ```
 
 ---
@@ -513,16 +623,36 @@ tests/
 
 ## Переменные окружения
 
+### AnythingLLM
+
 | Переменная | Описание | По умолчанию |
 |------------|----------|--------------|
 | `ANYTHINGLLM_API_URL` | URL AnythingLLM API | `http://localhost:3001` |
 | `ANYTHINGLLM_API_KEY` | API ключ | — |
 | `ANYTHINGLLM_WORKSPACE` | Воркспейс для чата | `holi-onboarding` |
 | `ANYTHINGLLM_SUMMARY_WORKSPACE` | Воркспейс для суммаризации | `holi-summarization` |
+
+### Онбординг
+
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
 | `ONBOARDING_QUEUE` | Название очереди | `onboarding` |
 | `ONBOARDING_JOB_TRIES` | Попытки выполнения джоба | `3` |
 | `ONBOARDING_JOB_BACKOFF` | Задержка между попытками (сек) | `10` |
 | `ONBOARDING_SESSION_EXPIRY_HOURS` | Время жизни сессии (часы) | `24` |
+
+### Голосовой ввод
+
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
+| `VOICE_DEFAULT_PROVIDER` | Провайдер по умолчанию | `anythingllm` |
+| `VOICE_MAX_FILE_SIZE` | Макс. размер файла (байты) | `26214400` (25MB) |
+| `VOICE_TIMEOUT` | Таймаут запроса (сек) | `60` |
+| `VOICE_DEFAULT_LANGUAGE` | Язык по умолчанию | `ru` |
+| `VOICE_ANYTHINGLLM_ENABLED` | Включить AnythingLLM | `true` |
+| `VOICE_OPENAI_ENABLED` | Включить OpenAI Whisper | `false` |
+| `OPENAI_API_KEY` | API ключ OpenAI | — |
+| `VOICE_OPENAI_MODEL` | Модель OpenAI | `whisper-1` |
 
 ---
 

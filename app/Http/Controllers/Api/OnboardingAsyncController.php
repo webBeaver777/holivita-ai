@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Onboarding\OnboardingServiceInterface;
 use App\Enums\MessageStatus;
 use App\Http\Controllers\Concerns\JsonResponses;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Onboarding\ChatRequest;
 use App\Http\Requests\Onboarding\MessageStatusRequest;
-use App\Contracts\Onboarding\OnboardingServiceInterface;
 use Illuminate\Http\JsonResponse;
 
 /**
