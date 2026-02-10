@@ -32,13 +32,17 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(OnboardingServiceInterface::class, OnboardingService::class);
 
-        $this->app->singleton(VoiceTranscriptionService::class, function () {
+        $this->app->singleton(OpenAIVoiceClient::class, function () {
+            return new OpenAIVoiceClient(
+                apiKey: (string) config('voice.openai.api_key', ''),
+                model: (string) config('voice.openai.model', 'whisper-1'),
+                timeout: (int) config('voice.openai.timeout', 60),
+            );
+        });
+
+        $this->app->singleton(VoiceTranscriptionService::class, function ($app) {
             return new VoiceTranscriptionService(
-                client: new OpenAIVoiceClient(
-                    apiKey: (string) config('voice.openai.api_key', ''),
-                    model: (string) config('voice.openai.model', 'whisper-1'),
-                    timeout: (int) config('voice.openai.timeout', 60),
-                ),
+                client: $app->make(OpenAIVoiceClient::class),
                 defaultLanguage: (string) config('voice.default_language', 'ru'),
                 storagePath: (string) config('voice.storage_path', 'voice-uploads'),
                 storageDisk: (string) config('voice.storage_disk', 'local'),
