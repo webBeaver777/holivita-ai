@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link } from "@inertiajs/vue3";
+import { Head, Link } from '@inertiajs/vue3'
 </script>
 
 <template>
@@ -11,9 +11,7 @@ import { Head, Link } from "@inertiajs/vue3";
         <div class="max-w-2xl w-full">
             <div class="bg-white rounded-2xl shadow-xl p-8 md:p-12">
                 <div class="text-center mb-10">
-                    <h1 class="text-4xl font-bold text-gray-800 mb-4">
-                        Holivita AI
-                    </h1>
+                    <h1 class="text-4xl font-bold text-gray-800 mb-4">Holivita AI</h1>
                     <p class="text-lg text-gray-600">
                         Добро пожаловать в систему онбординга здоровья
                     </p>
@@ -41,9 +39,7 @@ import { Head, Link } from "@inertiajs/vue3";
                             </svg>
                             <span>Начать онбординг</span>
                         </div>
-                        <p class="text-indigo-200 text-sm mt-1">
-                            Пройдите диалог с AI-ассистентом
-                        </p>
+                        <p class="text-indigo-200 text-sm mt-1">Пройдите диалог с AI-ассистентом</p>
                     </Link>
 
                     <Link
@@ -67,16 +63,12 @@ import { Head, Link } from "@inertiajs/vue3";
                             </svg>
                             <span>Просмотр суммаризаций</span>
                         </div>
-                        <p class="text-gray-500 text-sm mt-1">
-                            История завершённых сессий
-                        </p>
+                        <p class="text-gray-500 text-sm mt-1">История завершённых сессий</p>
                     </Link>
                 </div>
 
                 <div class="mt-10 pt-6 border-t border-gray-200">
-                    <h2
-                        class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4"
-                    >
+                    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
                         API Endpoints
                     </h2>
                     <div class="grid gap-2 text-sm text-gray-600">
@@ -105,9 +97,7 @@ import { Head, Link } from "@inertiajs/vue3";
                             <span>Завершение и суммаризация</span>
                         </div>
                         <div class="flex justify-between">
-                            <code class="bg-gray-100 px-2 py-1 rounded"
-                                >GET /api/summaries</code
-                            >
+                            <code class="bg-gray-100 px-2 py-1 rounded">GET /api/summaries</code>
                             <span>Список суммаризаций</span>
                         </div>
                     </div>

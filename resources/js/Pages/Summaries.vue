@@ -2,27 +2,27 @@
 /**
  * Страница просмотра суммаризаций онбординга.
  */
-import { ref, computed, watch } from "vue";
-import { Head } from "@inertiajs/vue3";
-import axios from "axios";
+import { ref, computed, watch } from 'vue'
+import { Head } from '@inertiajs/vue3'
+import axios from 'axios'
 
 // === STATE ===
-const summaries = ref([]);
-const searchUserId = ref("");
-const isLoading = ref(false);
-const error = ref(null);
-const selectedSummary = ref(null);
+const summaries = ref([])
+const searchUserId = ref('')
+const isLoading = ref(false)
+const error = ref(null)
+const selectedSummary = ref(null)
 
 // Пагинация
-const currentPage = ref(1);
-const lastPage = ref(1);
-const total = ref(0);
-const perPage = ref(10);
+const currentPage = ref(1)
+const lastPage = ref(1)
+const total = ref(0)
+const perPage = ref(10)
 
 // === COMPUTED ===
-const hasSummaries = computed(() => summaries.value.length > 0);
-const hasNextPage = computed(() => currentPage.value < lastPage.value);
-const hasPrevPage = computed(() => currentPage.value > 1);
+const hasSummaries = computed(() => summaries.value.length > 0)
+const hasNextPage = computed(() => currentPage.value < lastPage.value)
+const hasPrevPage = computed(() => currentPage.value > 1)
 
 // === METHODS ===
 
@@ -30,34 +30,34 @@ const hasPrevPage = computed(() => currentPage.value > 1);
  * Загрузка суммаризаций.
  */
 async function loadSummaries(page = 1) {
-    isLoading.value = true;
-    error.value = null;
+    isLoading.value = true
+    error.value = null
 
     try {
         const params = {
             per_page: perPage.value,
             page: page,
-        };
+        }
 
         if (searchUserId.value) {
-            params.user_id = parseInt(searchUserId.value);
+            params.user_id = parseInt(searchUserId.value)
         }
 
-        const response = await axios.get("/api/summaries", {
+        const response = await axios.get('/api/summaries', {
             params,
-        });
+        })
 
         if (response.data.success) {
-            summaries.value = response.data.data.items;
-            currentPage.value = response.data.data.pagination.current_page;
-            lastPage.value = response.data.data.pagination.last_page;
-            total.value = response.data.data.pagination.total;
+            summaries.value = response.data.data.items
+            currentPage.value = response.data.data.pagination.current_page
+            lastPage.value = response.data.data.pagination.last_page
+            total.value = response.data.data.pagination.total
         }
     } catch (err) {
-        console.error("Load summaries error:", err);
-        error.value = "Не удалось загрузить суммаризации.";
+        console.error('Load summaries error:', err)
+        error.value = 'Не удалось загрузить суммаризации.'
     } finally {
-        isLoading.value = false;
+        isLoading.value = false
     }
 }
 
@@ -65,17 +65,17 @@ async function loadSummaries(page = 1) {
  * Поиск по User ID.
  */
 function search() {
-    currentPage.value = 1;
-    loadSummaries(1);
+    currentPage.value = 1
+    loadSummaries(1)
 }
 
 /**
  * Сброс поиска.
  */
 function resetSearch() {
-    searchUserId.value = "";
-    currentPage.value = 1;
-    loadSummaries(1);
+    searchUserId.value = ''
+    currentPage.value = 1
+    loadSummaries(1)
 }
 
 /**
@@ -83,7 +83,7 @@ function resetSearch() {
  */
 function nextPage() {
     if (hasNextPage.value) {
-        loadSummaries(currentPage.value + 1);
+        loadSummaries(currentPage.value + 1)
     }
 }
 
@@ -92,7 +92,7 @@ function nextPage() {
  */
 function prevPage() {
     if (hasPrevPage.value) {
-        loadSummaries(currentPage.value - 1);
+        loadSummaries(currentPage.value - 1)
     }
 }
 
@@ -100,57 +100,55 @@ function prevPage() {
  * Открыть детали суммаризации.
  */
 function openDetails(summary) {
-    selectedSummary.value = summary;
+    selectedSummary.value = summary
 }
 
 /**
  * Закрыть детали.
  */
 function closeDetails() {
-    selectedSummary.value = null;
+    selectedSummary.value = null
 }
 
 /**
  * Форматирование даты.
  */
 function formatDate(isoString) {
-    if (!isoString) return "-";
-    return new Date(isoString).toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+    if (!isoString) return '-'
+    return new Date(isoString).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    })
 }
 
 /**
  * Форматирование JSON для отображения.
  */
 function formatSummaryPreview(summary) {
-    if (!summary) return "Нет данных";
+    if (!summary) return 'Нет данных'
 
     if (summary.summary_text) {
-        return summary.summary_text.substring(0, 100) + "...";
+        return summary.summary_text.substring(0, 100) + '...'
     }
 
     if (summary.health_goals && summary.health_goals.length > 0) {
-        return `Цели: ${summary.health_goals.slice(0, 2).join(", ")}...`;
+        return `Цели: ${summary.health_goals.slice(0, 2).join(', ')}...`
     }
 
-    return "Суммаризация доступна";
+    return 'Суммаризация доступна'
 }
 
 // Загрузка при монтировании
-loadSummaries();
+loadSummaries()
 </script>
 
 <template>
     <Head title="Суммаризации онбординга" />
 
-    <div
-        class="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 p-4"
-    >
+    <div class="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 p-4">
         <div class="max-w-6xl mx-auto">
             <!-- Header -->
             <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
@@ -167,9 +165,7 @@ loadSummaries();
                             >
                                 Суммаризации
                             </h1>
-                            <p class="text-sm text-gray-500">
-                                Всего записей: {{ total }}
-                            </p>
+                            <p class="text-sm text-gray-500">Всего записей: {{ total }}</p>
                         </div>
                     </div>
 
@@ -210,10 +206,7 @@ loadSummaries();
             </div>
 
             <!-- Загрузка -->
-            <div
-                v-if="isLoading"
-                class="bg-white rounded-2xl shadow-xl p-12 text-center"
-            >
+            <div v-if="isLoading" class="bg-white rounded-2xl shadow-xl p-12 text-center">
                 <div class="flex items-center justify-center space-x-2">
                     <div
                         class="w-3 h-3 bg-purple-500 rounded-full animate-bounce"
@@ -232,10 +225,7 @@ loadSummaries();
             </div>
 
             <!-- Пустой список -->
-            <div
-                v-else-if="!hasSummaries"
-                class="bg-white rounded-2xl shadow-xl p-12 text-center"
-            >
+            <div v-else-if="!hasSummaries" class="bg-white rounded-2xl shadow-xl p-12 text-center">
                 <div
                     class="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center"
                 >
@@ -287,9 +277,7 @@ loadSummaries();
                 </div>
 
                 <!-- Пагинация -->
-                <div
-                    class="flex items-center justify-between bg-white rounded-xl shadow-md p-4"
-                >
+                <div class="flex items-center justify-between bg-white rounded-xl shadow-md p-4">
                     <button
                         @click="prevPage"
                         :disabled="!hasPrevPage || isLoading"
@@ -336,9 +324,7 @@ loadSummaries();
                     >
                         <div>
                             <h2 class="text-lg font-bold">Суммаризация</h2>
-                            <p class="text-sm opacity-80">
-                                User ID: {{ selectedSummary.user_id }}
-                            </p>
+                            <p class="text-sm opacity-80">User ID: {{ selectedSummary.user_id }}</p>
                         </div>
                         <button
                             @click="closeDetails"
@@ -374,11 +360,7 @@ loadSummaries();
                                 v-if="selectedSummary.summary?.summary_text"
                                 class="bg-purple-50 rounded-xl p-4"
                             >
-                                <h3
-                                    class="text-sm font-semibold text-purple-700 mb-2"
-                                >
-                                    Описание
-                                </h3>
+                                <h3 class="text-sm font-semibold text-purple-700 mb-2">Описание</h3>
                                 <p class="text-gray-700">
                                     {{ selectedSummary.summary.summary_text }}
                                 </p>
@@ -386,23 +368,15 @@ loadSummaries();
 
                             <!-- Health Goals -->
                             <div
-                                v-if="
-                                    selectedSummary.summary?.health_goals
-                                        ?.length
-                                "
+                                v-if="selectedSummary.summary?.health_goals?.length"
                                 class="bg-green-50 rounded-xl p-4"
                             >
-                                <h3
-                                    class="text-sm font-semibold text-green-700 mb-2"
-                                >
+                                <h3 class="text-sm font-semibold text-green-700 mb-2">
                                     Цели здоровья
                                 </h3>
-                                <ul
-                                    class="list-disc list-inside text-gray-700 space-y-1"
-                                >
+                                <ul class="list-disc list-inside text-gray-700 space-y-1">
                                     <li
-                                        v-for="goal in selectedSummary.summary
-                                            .health_goals"
+                                        v-for="goal in selectedSummary.summary.health_goals"
                                         :key="goal"
                                     >
                                         {{ goal }}
@@ -412,20 +386,13 @@ loadSummaries();
 
                             <!-- Current Health Issues -->
                             <div
-                                v-if="
-                                    selectedSummary.summary
-                                        ?.current_health_issues?.length
-                                "
+                                v-if="selectedSummary.summary?.current_health_issues?.length"
                                 class="bg-orange-50 rounded-xl p-4"
                             >
-                                <h3
-                                    class="text-sm font-semibold text-orange-700 mb-2"
-                                >
+                                <h3 class="text-sm font-semibold text-orange-700 mb-2">
                                     Текущие проблемы
                                 </h3>
-                                <ul
-                                    class="list-disc list-inside text-gray-700 space-y-1"
-                                >
+                                <ul class="list-disc list-inside text-gray-700 space-y-1">
                                     <li
                                         v-for="issue in selectedSummary.summary
                                             .current_health_issues"
@@ -441,64 +408,32 @@ loadSummaries();
                                 v-if="selectedSummary.summary?.lifestyle"
                                 class="bg-blue-50 rounded-xl p-4"
                             >
-                                <h3
-                                    class="text-sm font-semibold text-blue-700 mb-2"
-                                >
+                                <h3 class="text-sm font-semibold text-blue-700 mb-2">
                                     Образ жизни
                                 </h3>
                                 <div class="grid grid-cols-2 gap-3 text-sm">
-                                    <div
-                                        v-if="
-                                            selectedSummary.summary.lifestyle
-                                                .sleep
-                                        "
-                                    >
+                                    <div v-if="selectedSummary.summary.lifestyle.sleep">
                                         <span class="text-gray-500">Сон:</span>
                                         <span class="text-gray-700 ml-1">{{
-                                            selectedSummary.summary.lifestyle
-                                                .sleep
+                                            selectedSummary.summary.lifestyle.sleep
                                         }}</span>
                                     </div>
-                                    <div
-                                        v-if="
-                                            selectedSummary.summary.lifestyle
-                                                .nutrition
-                                        "
-                                    >
-                                        <span class="text-gray-500"
-                                            >Питание:</span
-                                        >
+                                    <div v-if="selectedSummary.summary.lifestyle.nutrition">
+                                        <span class="text-gray-500">Питание:</span>
                                         <span class="text-gray-700 ml-1">{{
-                                            selectedSummary.summary.lifestyle
-                                                .nutrition
+                                            selectedSummary.summary.lifestyle.nutrition
                                         }}</span>
                                     </div>
-                                    <div
-                                        v-if="
-                                            selectedSummary.summary.lifestyle
-                                                .activity
-                                        "
-                                    >
-                                        <span class="text-gray-500"
-                                            >Активность:</span
-                                        >
+                                    <div v-if="selectedSummary.summary.lifestyle.activity">
+                                        <span class="text-gray-500">Активность:</span>
                                         <span class="text-gray-700 ml-1">{{
-                                            selectedSummary.summary.lifestyle
-                                                .activity
+                                            selectedSummary.summary.lifestyle.activity
                                         }}</span>
                                     </div>
-                                    <div
-                                        v-if="
-                                            selectedSummary.summary.lifestyle
-                                                .stress
-                                        "
-                                    >
-                                        <span class="text-gray-500"
-                                            >Стресс:</span
-                                        >
+                                    <div v-if="selectedSummary.summary.lifestyle.stress">
+                                        <span class="text-gray-500">Стресс:</span>
                                         <span class="text-gray-700 ml-1">{{
-                                            selectedSummary.summary.lifestyle
-                                                .stress
+                                            selectedSummary.summary.lifestyle.stress
                                         }}</span>
                                     </div>
                                 </div>
@@ -506,23 +441,15 @@ loadSummaries();
 
                             <!-- Recommendations -->
                             <div
-                                v-if="
-                                    selectedSummary.summary
-                                        ?.recommendations_focus?.length
-                                "
+                                v-if="selectedSummary.summary?.recommendations_focus?.length"
                                 class="bg-indigo-50 rounded-xl p-4"
                             >
-                                <h3
-                                    class="text-sm font-semibold text-indigo-700 mb-2"
-                                >
+                                <h3 class="text-sm font-semibold text-indigo-700 mb-2">
                                     Фокус рекомендаций
                                 </h3>
-                                <ul
-                                    class="list-disc list-inside text-gray-700 space-y-1"
-                                >
+                                <ul class="list-disc list-inside text-gray-700 space-y-1">
                                     <li
-                                        v-for="rec in selectedSummary.summary
-                                            .recommendations_focus"
+                                        v-for="rec in selectedSummary.summary.recommendations_focus"
                                         :key="rec"
                                     >
                                         {{ rec }}
@@ -538,20 +465,10 @@ loadSummaries();
                                 "
                                 class="bg-gray-50 rounded-xl p-4"
                             >
-                                <h3
-                                    class="text-sm font-semibold text-gray-700 mb-2"
-                                >
-                                    Данные
-                                </h3>
+                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Данные</h3>
                                 <pre
                                     class="text-xs text-gray-600 overflow-x-auto whitespace-pre-wrap"
-                                    >{{
-                                        JSON.stringify(
-                                            selectedSummary.summary,
-                                            null,
-                                            2,
-                                        )
-                                    }}</pre
+                                    >{{ JSON.stringify(selectedSummary.summary, null, 2) }}</pre
                                 >
                             </div>
                         </div>
@@ -570,13 +487,13 @@ loadSummaries();
     overflow: hidden;
 }
 
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
 
-input[type="number"] {
+input[type='number'] {
     -moz-appearance: textfield;
 }
 </style>

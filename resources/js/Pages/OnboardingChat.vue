@@ -4,29 +4,29 @@
  * Заботливый AI-ассистент для знакомства с пользователем.
  * MVP версия с ручным вводом user_id.
  */
-import { ref, computed, nextTick } from "vue";
-import { Head } from "@inertiajs/vue3";
-import axios from "axios";
-import { useVoiceRecorder } from "@/composables/useVoiceRecorder";
+import { ref, computed, nextTick } from 'vue'
+import { Head } from '@inertiajs/vue3'
+import axios from 'axios'
+import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 
 // === STATE ===
 
 // Форма входа
-const userIdInput = ref("");
-const userId = ref(null);
-const userIdError = ref("");
-const isValidating = ref(false);
-const activeSessionId = ref(null);
-const isCancelling = ref(false);
+const userIdInput = ref('')
+const userId = ref(null)
+const userIdError = ref('')
+const isValidating = ref(false)
+const activeSessionId = ref(null)
+const isCancelling = ref(false)
 
 // Чат
-const messages = ref([]);
-const userInput = ref("");
-const isLoading = ref(false);
-const isCompleted = ref(false);
-const sessionId = ref(null);
-const error = ref(null);
-const messagesContainer = ref(null);
+const messages = ref([])
+const userInput = ref('')
+const isLoading = ref(false)
+const isCompleted = ref(false)
+const sessionId = ref(null)
+const error = ref(null)
+const messagesContainer = ref(null)
 
 // Голосовой ввод
 const {
@@ -40,7 +40,7 @@ const {
     transcribe,
     clearError: clearVoiceError,
     cleanup: cleanupVoice,
-} = useVoiceRecorder();
+} = useVoiceRecorder()
 
 // === COMPUTED ===
 
@@ -51,14 +51,14 @@ const canSend = computed(() => {
         !isCompleted.value &&
         !isRecording.value &&
         !isTranscribing.value
-    );
-});
+    )
+})
 
 const canRecord = computed(() => {
-    return !isLoading.value && !isCompleted.value && !isTranscribing.value;
-});
+    return !isLoading.value && !isCompleted.value && !isTranscribing.value
+})
 
-const hasMessages = computed(() => messages.value.length > 0);
+const hasMessages = computed(() => messages.value.length > 0)
 
 // === METHODS ===
 
@@ -66,10 +66,9 @@ const hasMessages = computed(() => messages.value.length > 0);
  * Прокрутка к последнему сообщению.
  */
 async function scrollToBottom() {
-    await nextTick();
+    await nextTick()
     if (messagesContainer.value) {
-        messagesContainer.value.scrollTop =
-            messagesContainer.value.scrollHeight;
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
 }
 
@@ -77,39 +76,35 @@ async function scrollToBottom() {
  * Валидация User ID через API.
  */
 async function validateUserId() {
-    if (!userIdInput.value) return;
+    if (!userIdInput.value) return
 
-    isValidating.value = true;
-    userIdError.value = "";
-    activeSessionId.value = null;
+    isValidating.value = true
+    userIdError.value = ''
+    activeSessionId.value = null
 
     try {
-        const response = await axios.post("/api/onboarding/validate-user", {
+        const response = await axios.post('/api/onboarding/validate-user', {
             user_id: parseInt(userIdInput.value),
-        });
+        })
 
         if (response.data.success) {
-            userId.value = parseInt(userIdInput.value);
-            await startOnboarding();
+            userId.value = parseInt(userIdInput.value)
+            await startOnboarding()
         }
     } catch (err) {
-        if (
-            err.response?.status === 409 &&
-            err.response?.data?.active_session_id
-        ) {
-            activeSessionId.value = err.response.data.active_session_id;
+        if (err.response?.status === 409 && err.response?.data?.active_session_id) {
+            activeSessionId.value = err.response.data.active_session_id
             userIdError.value =
-                err.response.data.message ||
-                "У вас уже есть активная сессия онбординга.";
+                err.response.data.message || 'У вас уже есть активная сессия онбординга.'
         } else if (err.response?.data?.message) {
-            userIdError.value = err.response.data.message;
+            userIdError.value = err.response.data.message
         } else if (err.response?.status === 422) {
-            userIdError.value = "Введите корректный User ID (число).";
+            userIdError.value = 'Введите корректный User ID (число).'
         } else {
-            userIdError.value = "Ошибка проверки User ID. Попробуйте ещё раз.";
+            userIdError.value = 'Ошибка проверки User ID. Попробуйте ещё раз.'
         }
     } finally {
-        isValidating.value = false;
+        isValidating.value = false
     }
 }
 
@@ -117,24 +112,23 @@ async function validateUserId() {
  * Отмена активной сессии.
  */
 async function cancelActiveSession() {
-    if (!activeSessionId.value || !userIdInput.value) return;
+    if (!activeSessionId.value || !userIdInput.value) return
 
-    isCancelling.value = true;
+    isCancelling.value = true
 
     try {
-        await axios.post("/api/onboarding/cancel", {
+        await axios.post('/api/onboarding/cancel', {
             user_id: parseInt(userIdInput.value),
             session_id: activeSessionId.value,
-        });
+        })
 
-        activeSessionId.value = null;
-        userIdError.value = "";
-        await validateUserId();
+        activeSessionId.value = null
+        userIdError.value = ''
+        await validateUserId()
     } catch (err) {
-        userIdError.value =
-            err.response?.data?.error || "Не удалось отменить сессию.";
+        userIdError.value = err.response?.data?.error || 'Не удалось отменить сессию.'
     } finally {
-        isCancelling.value = false;
+        isCancelling.value = false
     }
 }
 
@@ -142,34 +136,34 @@ async function cancelActiveSession() {
  * Продолжить существующую сессию.
  */
 async function continueExistingSession() {
-    if (!activeSessionId.value || !userIdInput.value) return;
+    if (!activeSessionId.value || !userIdInput.value) return
 
-    userId.value = parseInt(userIdInput.value);
-    sessionId.value = activeSessionId.value;
-    activeSessionId.value = null;
-    userIdError.value = "";
+    userId.value = parseInt(userIdInput.value)
+    sessionId.value = activeSessionId.value
+    activeSessionId.value = null
+    userIdError.value = ''
 
-    isLoading.value = true;
+    isLoading.value = true
     try {
-        const response = await axios.get("/api/onboarding/history", {
+        const response = await axios.get('/api/onboarding/history', {
             params: {
                 user_id: userId.value,
             },
-        });
+        })
 
         if (response.data.success && response.data.data.messages) {
             messages.value = response.data.data.messages.map((msg) => ({
                 role: msg.role,
                 content: msg.content,
-            }));
-            isCompleted.value = response.data.data.is_completed;
+            }))
+            isCompleted.value = response.data.data.is_completed
         }
     } catch (err) {
-        console.error("Load history error:", err);
-        await startOnboarding();
+        console.error('Load history error:', err)
+        await startOnboarding()
     } finally {
-        isLoading.value = false;
-        await scrollToBottom();
+        isLoading.value = false
+        await scrollToBottom()
     }
 }
 
@@ -177,33 +171,32 @@ async function continueExistingSession() {
  * Начало онбординга - получение приветствия от HOLI.
  */
 async function startOnboarding() {
-    isLoading.value = true;
-    error.value = null;
+    isLoading.value = true
+    error.value = null
 
     try {
-        const response = await axios.post("/api/onboarding/chat", {
+        const response = await axios.post('/api/onboarding/chat', {
             user_id: userId.value,
             session_id: null,
             message: null,
             conversation_history: [],
-        });
+        })
 
         if (response.data.success) {
-            const data = response.data.data;
-            sessionId.value = data.session_id;
+            const data = response.data.data
+            sessionId.value = data.session_id
 
             messages.value.push({
-                role: "assistant",
+                role: 'assistant',
                 content: data.message,
-            });
+            })
         }
     } catch (err) {
-        console.error("Start onboarding error:", err);
-        error.value =
-            "Не удалось начать онбординг. Попробуйте обновить страницу.";
+        console.error('Start onboarding error:', err)
+        error.value = 'Не удалось начать онбординг. Попробуйте обновить страницу.'
     } finally {
-        isLoading.value = false;
-        await scrollToBottom();
+        isLoading.value = false
+        await scrollToBottom()
     }
 }
 
@@ -211,54 +204,52 @@ async function startOnboarding() {
  * Отправка сообщения пользователя.
  */
 async function sendMessage() {
-    if (!canSend.value) return;
+    if (!canSend.value) return
 
-    const userMessage = userInput.value.trim();
-    userInput.value = "";
-    error.value = null;
+    const userMessage = userInput.value.trim()
+    userInput.value = ''
+    error.value = null
 
     messages.value.push({
-        role: "user",
+        role: 'user',
         content: userMessage,
-    });
+    })
 
-    await scrollToBottom();
-    isLoading.value = true;
+    await scrollToBottom()
+    isLoading.value = true
 
     try {
         const conversationHistory = messages.value.map((msg) => ({
             role: msg.role,
             content: msg.content,
-        }));
+        }))
 
-        const response = await axios.post("/api/onboarding/chat", {
+        const response = await axios.post('/api/onboarding/chat', {
             user_id: userId.value,
             session_id: sessionId.value,
             message: userMessage,
             conversation_history: conversationHistory,
-        });
+        })
 
         if (response.data.success) {
-            const data = response.data.data;
+            const data = response.data.data
 
             messages.value.push({
-                role: "assistant",
+                role: 'assistant',
                 content: data.message,
-            });
+            })
 
             if (data.completed) {
-                await completeOnboarding();
+                await completeOnboarding()
             }
         }
     } catch (err) {
-        console.error("Chat error:", err);
-        error.value =
-            err.response?.data?.error ||
-            "Произошла ошибка. Попробуйте ещё раз.";
-        messages.value.pop();
+        console.error('Chat error:', err)
+        error.value = err.response?.data?.error || 'Произошла ошибка. Попробуйте ещё раз.'
+        messages.value.pop()
     } finally {
-        isLoading.value = false;
-        await scrollToBottom();
+        isLoading.value = false
+        await scrollToBottom()
     }
 }
 
@@ -267,34 +258,34 @@ async function sendMessage() {
  */
 async function completeOnboarding() {
     try {
-        const response = await axios.post("/api/onboarding/complete", {
+        const response = await axios.post('/api/onboarding/complete', {
             user_id: userId.value,
             session_id: sessionId.value,
-        });
+        })
 
         if (response.data.success) {
-            isCompleted.value = true;
+            isCompleted.value = true
 
             messages.value.push({
-                role: "assistant",
+                role: 'assistant',
                 content:
-                    "Отлично! Я узнал тебя получше. Теперь смогу давать более персональные рекомендации. Добро пожаловать в Holivita!",
-            });
+                    'Отлично! Я узнал тебя получше. Теперь смогу давать более персональные рекомендации. Добро пожаловать в Holivita!',
+            })
         }
     } catch (err) {
-        console.error("Complete error:", err);
+        console.error('Complete error:', err)
     }
 
-    await scrollToBottom();
+    await scrollToBottom()
 }
 
 /**
  * Обработка Enter.
  */
 function handleKeydown(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        sendMessage();
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault()
+        sendMessage()
     }
 }
 
@@ -302,15 +293,15 @@ function handleKeydown(event) {
  * Сброс и начало заново.
  */
 function resetChat() {
-    userId.value = null;
-    userIdInput.value = "";
-    messages.value = [];
-    sessionId.value = null;
-    isCompleted.value = false;
-    error.value = null;
-    activeSessionId.value = null;
-    userIdError.value = "";
-    cleanupVoice();
+    userId.value = null
+    userIdInput.value = ''
+    messages.value = []
+    sessionId.value = null
+    isCompleted.value = false
+    error.value = null
+    activeSessionId.value = null
+    userIdError.value = ''
+    cleanupVoice()
 }
 
 // === VOICE INPUT ===
@@ -320,9 +311,9 @@ function resetChat() {
  */
 async function toggleVoiceRecording() {
     if (isRecording.value) {
-        await stopAndTranscribe();
+        await stopAndTranscribe()
     } else {
-        await startRecording();
+        await startRecording()
     }
 }
 
@@ -330,14 +321,14 @@ async function toggleVoiceRecording() {
  * Остановить запись и транскрибировать.
  */
 async function stopAndTranscribe() {
-    const audioData = await stopRecording();
-    if (!audioData) return;
+    const audioData = await stopRecording()
+    if (!audioData) return
 
-    const result = await transcribe(audioData, userId.value, sessionId.value);
+    const result = await transcribe(audioData, userId.value, sessionId.value)
     if (result?.text) {
-        userInput.value = result.text;
-        await nextTick();
-        await sendMessage();
+        userInput.value = result.text
+        await nextTick()
+        await sendMessage()
     }
 }
 </script>
@@ -345,9 +336,7 @@ async function stopAndTranscribe() {
 <template>
     <Head title="Знакомство с HOLI" />
 
-    <div
-        class="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 p-4"
-    >
+    <div class="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 p-4">
         <div class="max-w-2xl mx-auto">
             <!-- === ФОРМА ВВОДА USER ID === -->
             <div v-if="!userId" class="bg-white rounded-2xl shadow-xl p-8 mt-8">
@@ -363,9 +352,7 @@ async function stopAndTranscribe() {
                     >
                         Добро пожаловать в HOLI
                     </h1>
-                    <p class="text-gray-500">
-                        Ваш заботливый AI-помощник в мире здоровья
-                    </p>
+                    <p class="text-gray-500">Ваш заботливый AI-помощник в мире здоровья</p>
                 </div>
 
                 <!-- Форма -->
@@ -429,19 +416,12 @@ async function stopAndTranscribe() {
                                 <div class="flex-1">
                                     <p
                                         class="text-sm"
-                                        :class="
-                                            activeSessionId
-                                                ? 'text-amber-700'
-                                                : 'text-red-600'
-                                        "
+                                        :class="activeSessionId ? 'text-amber-700' : 'text-red-600'"
                                     >
                                         {{ userIdError }}
                                     </p>
                                     <!-- Кнопки для активной сессии -->
-                                    <div
-                                        v-if="activeSessionId"
-                                        class="mt-3 flex flex-wrap gap-2"
-                                    >
+                                    <div v-if="activeSessionId" class="mt-3 flex flex-wrap gap-2">
                                         <button
                                             class="px-4 py-2 bg-purple-500 text-white text-sm rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50"
                                             :disabled="isCancelling"
@@ -454,10 +434,7 @@ async function stopAndTranscribe() {
                                             :disabled="isCancelling"
                                             @click="cancelActiveSession"
                                         >
-                                            <span
-                                                v-if="isCancelling"
-                                                class="flex items-center"
-                                            >
+                                            <span v-if="isCancelling" class="flex items-center">
                                                 <svg
                                                     class="animate-spin -ml-1 mr-2 h-4 w-4"
                                                     fill="none"
@@ -479,9 +456,7 @@ async function stopAndTranscribe() {
                                                 </svg>
                                                 Отмена...
                                             </span>
-                                            <span v-else
-                                                >Отменить и начать заново</span
-                                            >
+                                            <span v-else>Отменить и начать заново</span>
                                         </button>
                                     </div>
                                 </div>
@@ -495,10 +470,7 @@ async function stopAndTranscribe() {
                         :disabled="!userIdInput || isValidating"
                         @click="validateUserId"
                     >
-                        <span
-                            v-if="isValidating"
-                            class="flex items-center justify-center"
-                        >
+                        <span v-if="isValidating" class="flex items-center justify-center">
                             <svg
                                 class="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
                                 fill="none"
@@ -548,15 +520,11 @@ async function stopAndTranscribe() {
                                 >
                                     HOLI
                                 </h1>
-                                <p class="text-xs text-gray-500">
-                                    Ваш заботливый помощник
-                                </p>
+                                <p class="text-xs text-gray-500">Ваш заботливый помощник</p>
                             </div>
                         </div>
                         <div class="flex items-center space-x-3">
-                            <span
-                                class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full"
-                            >
+                            <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
                                 ID: {{ userId }}
                             </span>
                             <button
@@ -582,9 +550,7 @@ async function stopAndTranscribe() {
                             :key="index"
                             :class="[
                                 'flex',
-                                message.role === 'user'
-                                    ? 'justify-end'
-                                    : 'justify-start',
+                                message.role === 'user' ? 'justify-end' : 'justify-start',
                             ]"
                         >
                             <div
@@ -595,9 +561,7 @@ async function stopAndTranscribe() {
                                         : 'bg-white text-gray-700 rounded-bl-md border border-gray-100',
                                 ]"
                             >
-                                <p
-                                    class="text-sm leading-relaxed whitespace-pre-wrap"
-                                >
+                                <p class="text-sm leading-relaxed whitespace-pre-wrap">
                                     {{ message.content }}
                                 </p>
                             </div>
@@ -640,18 +604,11 @@ async function stopAndTranscribe() {
                 </div>
 
                 <!-- Индикатор завершения -->
-                <div
-                    v-if="isCompleted"
-                    class="bg-white/70 px-4 py-3 flex-shrink-0"
-                >
+                <div v-if="isCompleted" class="bg-white/70 px-4 py-3 flex-shrink-0">
                     <div
                         class="flex items-center justify-center bg-green-50 text-green-600 rounded-xl px-4 py-2 text-sm border border-green-200"
                     >
-                        <svg
-                            class="w-4 h-4 mr-2"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                        >
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                             <path
                                 fill-rule="evenodd"
                                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -689,19 +646,13 @@ async function stopAndTranscribe() {
                                         clip-rule="evenodd"
                                     />
                                 </svg>
-                                <span class="text-xs text-amber-700">{{
-                                    voiceError
-                                }}</span>
+                                <span class="text-xs text-amber-700">{{ voiceError }}</span>
                             </div>
                             <button
                                 class="text-amber-500 hover:text-amber-700 ml-2"
                                 @click="clearVoiceError"
                             >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                >
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path
                                         fill-rule="evenodd"
                                         d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
@@ -735,18 +686,12 @@ async function stopAndTranscribe() {
                                             class="absolute inset-0 w-3 h-3 bg-red-400 rounded-full animate-ping"
                                         />
                                     </div>
-                                    <span
-                                        class="text-sm text-red-700 font-medium"
-                                        >Запись...</span
-                                    >
-                                    <span
-                                        class="text-sm text-red-500 font-mono"
-                                        >{{ formattedRecordingDuration }}</span
-                                    >
+                                    <span class="text-sm text-red-700 font-medium">Запись...</span>
+                                    <span class="text-sm text-red-500 font-mono">{{
+                                        formattedRecordingDuration
+                                    }}</span>
                                 </div>
-                                <span class="text-xs text-red-400"
-                                    >Нажмите для завершения</span
-                                >
+                                <span class="text-xs text-red-400">Нажмите для завершения</span>
                             </div>
                         </div>
                     </Transition>
@@ -784,9 +729,7 @@ async function stopAndTranscribe() {
                                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                                     />
                                 </svg>
-                                <span class="text-sm text-purple-700"
-                                    >Распознавание речи...</span
-                                >
+                                <span class="text-sm text-purple-700">Распознавание речи...</span>
                             </div>
                         </div>
                     </Transition>
@@ -794,12 +737,7 @@ async function stopAndTranscribe() {
                     <div class="flex items-end space-x-2">
                         <textarea
                             v-model="userInput"
-                            :disabled="
-                                isLoading ||
-                                isCompleted ||
-                                isRecording ||
-                                isTranscribing
-                            "
+                            :disabled="isLoading || isCompleted || isRecording || isTranscribing"
                             :placeholder="
                                 isCompleted
                                     ? 'Знакомство завершено'
@@ -823,11 +761,7 @@ async function stopAndTranscribe() {
                                     ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-105 active:scale-95',
                             ]"
-                            :title="
-                                isRecording
-                                    ? 'Остановить запись'
-                                    : 'Голосовой ввод'
-                            "
+                            :title="isRecording ? 'Остановить запись' : 'Голосовой ввод'"
                             @click="toggleVoiceRecording"
                         >
                             <!-- Иконка микрофона -->
@@ -846,19 +780,8 @@ async function stopAndTranscribe() {
                                 />
                             </svg>
                             <!-- Иконка стоп -->
-                            <svg
-                                v-else
-                                class="w-5 h-5"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <rect
-                                    x="6"
-                                    y="6"
-                                    width="12"
-                                    height="12"
-                                    rx="2"
-                                />
+                            <svg v-else class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <rect x="6" y="6" width="12" height="12" rx="2" />
                             </svg>
                         </button>
 
@@ -928,13 +851,13 @@ textarea {
 }
 
 /* Убираем стрелки у input[type=number] */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
 
-input[type="number"] {
+input[type='number'] {
     -moz-appearance: textfield;
 }
 </style>
