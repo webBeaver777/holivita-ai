@@ -108,7 +108,7 @@ class VoiceControllerTest extends TestCase
     {
         $this->mockService->shouldReceive('transcribe')
             ->once()
-            ->andThrow(VoiceTranscriptionException::providerUnavailable('openai'));
+            ->andThrow(new VoiceTranscriptionException('OpenAI unavailable'));
 
         $audioFile = $this->createAudioFile();
 
@@ -119,6 +119,25 @@ class VoiceControllerTest extends TestCase
 
         $response->assertServiceUnavailable()
             ->assertJson(['success' => false]);
+    }
+
+    #[Test]
+    public function it_returns_service_status(): void
+    {
+        $this->mockService->shouldReceive('isAvailable')
+            ->once()
+            ->andReturn(true);
+
+        $response = $this->getJson('/api/voice/status');
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'available' => true,
+                    'provider' => 'openai',
+                ],
+            ]);
     }
 
     #[Test]
@@ -175,128 +194,6 @@ class VoiceControllerTest extends TestCase
     }
 
     #[Test]
-    public function it_validates_provider_value(): void
-    {
-        $audioFile = $this->createAudioFile();
-
-        $response = $this->postJson('/api/voice/transcribe', [
-            'audio' => $audioFile,
-            'provider' => 'invalid_provider',
-            'user_id' => 1,
-        ]);
-
-        $response->assertUnprocessable()
-            ->assertJsonValidationErrors(['provider']);
-    }
-
-    #[Test]
-    public function it_transcribes_with_fallback_successfully(): void
-    {
-        $expectedResponse = new TranscriptionResponseDTO(
-            text: 'Текст с fallback',
-            language: 'ru',
-            confidence: 0.9,
-            duration: 3.0,
-            provider: 'openai',
-        );
-
-        $this->mockService->shouldReceive('transcribeWithFallback')
-            ->once()
-            ->andReturn($expectedResponse);
-
-        $audioFile = $this->createAudioFile();
-
-        $response = $this->postJson('/api/voice/transcribe-fallback', [
-            'audio' => $audioFile,
-            'user_id' => 1,
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'text' => 'Текст с fallback',
-                    'provider' => 'openai',
-                ],
-            ]);
-    }
-
-    #[Test]
-    public function it_returns_providers_with_status(): void
-    {
-        $this->mockService->shouldReceive('getProviders')
-            ->once()
-            ->andReturn([
-                'openai' => [
-                    'name' => 'OpenAI Whisper (Cloud)',
-                    'enabled' => true,
-                    'available' => true,
-                    'is_default' => true,
-                ],
-                'anythingllm' => [
-                    'name' => 'AnythingLLM (Local)',
-                    'enabled' => true,
-                    'available' => false,
-                    'is_default' => false,
-                ],
-            ]);
-
-        $this->mockService->shouldReceive('getDefaultProvider')
-            ->once()
-            ->andReturn('openai');
-
-        $response = $this->getJson('/api/voice/providers');
-
-        $response->assertOk()
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'default' => 'openai',
-                ],
-            ])
-            ->assertJsonStructure([
-                'success',
-                'data' => [
-                    'providers' => [
-                        'openai' => ['name', 'enabled', 'available', 'is_default'],
-                        'anythingllm' => ['name', 'enabled', 'available', 'is_default'],
-                    ],
-                    'default',
-                ],
-            ]);
-    }
-
-    #[Test]
-    public function it_accepts_valid_provider_openai(): void
-    {
-        $expectedResponse = new TranscriptionResponseDTO(
-            text: 'Test',
-            language: 'ru',
-            provider: 'openai',
-        );
-
-        $this->mockService->shouldReceive('transcribe')
-            ->once()
-            ->andReturn($expectedResponse);
-
-        $audioFile = $this->createAudioFile();
-
-        $response = $this->postJson('/api/voice/transcribe', [
-            'audio' => $audioFile,
-            'provider' => 'openai',
-            'user_id' => 1,
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'provider' => 'openai',
-                ],
-            ]);
-    }
-
-    #[Test]
     public function it_accepts_session_id_parameter(): void
     {
         $expectedResponse = new TranscriptionResponseDTO(
@@ -310,44 +207,13 @@ class VoiceControllerTest extends TestCase
             ->andReturn($expectedResponse);
 
         $audioFile = $this->createAudioFile();
-        $sessionId = '550e8400-e29b-41d4-a716-446655440000';
 
         $response = $this->postJson('/api/voice/transcribe', [
             'audio' => $audioFile,
             'user_id' => 1,
-            'session_id' => $sessionId,
+            'session_id' => '550e8400-e29b-41d4-a716-446655440000',
         ]);
 
         $response->assertOk();
-    }
-
-    #[Test]
-    public function it_handles_empty_response_on_fallback(): void
-    {
-        $expectedResponse = new TranscriptionResponseDTO(
-            text: '   ',
-            language: 'ru',
-            provider: 'openai',
-        );
-
-        $this->mockService->shouldReceive('transcribeWithFallback')
-            ->once()
-            ->andReturn($expectedResponse);
-
-        $audioFile = $this->createAudioFile();
-
-        $response = $this->postJson('/api/voice/transcribe-fallback', [
-            'audio' => $audioFile,
-            'user_id' => 1,
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'text' => '',
-                    'message' => 'Не удалось распознать речь. Попробуйте ещё раз.',
-                ],
-            ]);
     }
 }

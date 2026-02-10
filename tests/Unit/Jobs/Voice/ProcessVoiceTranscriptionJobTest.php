@@ -40,7 +40,7 @@ class ProcessVoiceTranscriptionJobTest extends TestCase
 
         $transcription = VoiceTranscription::create([
             'user_id' => 1,
-            'provider' => 'anythingllm',
+            'provider' => 'openai',
             'language' => 'ru',
             'original_filename' => 'audio.webm',
             'stored_path' => $storedPath,
@@ -50,24 +50,24 @@ class ProcessVoiceTranscriptionJobTest extends TestCase
         ]);
 
         $mockService = Mockery::mock(VoiceTranscriptionService::class);
-        $mockService->shouldReceive('transcribeWithFallback')
+        $mockService->shouldReceive('transcribe')
             ->once()
             ->andReturn(new TranscriptionResponseDTO(
                 text: 'Привет, мир!',
                 language: 'ru',
                 confidence: 0.95,
                 duration: 2.5,
-                provider: 'anythingllm',
+                provider: 'openai',
             ));
 
-        $job = new ProcessVoiceTranscriptionJob($transcription, true);
+        $job = new ProcessVoiceTranscriptionJob($transcription);
         $job->handle($mockService);
 
         $transcription->refresh();
 
         $this->assertEquals(MessageStatus::COMPLETED, $transcription->status);
         $this->assertEquals('Привет, мир!', $transcription->transcribed_text);
-        $this->assertEquals('anythingllm', $transcription->provider);
+        $this->assertEquals('openai', $transcription->provider);
         $this->assertEquals(0.95, $transcription->confidence);
         $this->assertEquals(2.5, $transcription->duration);
     }
@@ -88,21 +88,20 @@ class ProcessVoiceTranscriptionJobTest extends TestCase
         ]);
 
         $mockService = Mockery::mock(VoiceTranscriptionService::class);
-        $mockService->shouldReceive('transcribeWithFallback')
+        $mockService->shouldReceive('transcribe')
             ->once()
             ->andReturnUsing(function () use ($transcription) {
-                // Проверяем, что статус изменился на processing
                 $transcription->refresh();
                 $this->assertEquals(MessageStatus::PROCESSING, $transcription->status);
 
                 return new TranscriptionResponseDTO(
                     text: 'Test',
                     language: 'ru',
-                    provider: 'anythingllm',
+                    provider: 'openai',
                 );
             });
 
-        $job = new ProcessVoiceTranscriptionJob($transcription, true);
+        $job = new ProcessVoiceTranscriptionJob($transcription);
         $job->handle($mockService);
     }
 
@@ -122,15 +121,15 @@ class ProcessVoiceTranscriptionJobTest extends TestCase
         ]);
 
         $mockService = Mockery::mock(VoiceTranscriptionService::class);
-        $mockService->shouldReceive('transcribeWithFallback')
+        $mockService->shouldReceive('transcribe')
             ->once()
             ->andReturn(new TranscriptionResponseDTO(
                 text: 'Test',
                 language: 'ru',
-                provider: 'anythingllm',
+                provider: 'openai',
             ));
 
-        $job = new ProcessVoiceTranscriptionJob($transcription, true);
+        $job = new ProcessVoiceTranscriptionJob($transcription);
         $job->handle($mockService);
 
         Storage::disk('local')->assertMissing($storedPath);
@@ -152,11 +151,11 @@ class ProcessVoiceTranscriptionJobTest extends TestCase
         ]);
 
         $mockService = Mockery::mock(VoiceTranscriptionService::class);
-        $mockService->shouldReceive('transcribeWithFallback')
+        $mockService->shouldReceive('transcribe')
             ->once()
-            ->andThrow(VoiceTranscriptionException::providerUnavailable('anythingllm'));
+            ->andThrow(new VoiceTranscriptionException('API error'));
 
-        $job = new ProcessVoiceTranscriptionJob($transcription, true);
+        $job = new ProcessVoiceTranscriptionJob($transcription);
 
         $this->expectException(VoiceTranscriptionException::class);
 
@@ -167,38 +166,6 @@ class ProcessVoiceTranscriptionJobTest extends TestCase
             $this->assertEquals(MessageStatus::FAILED, $transcription->status);
             $this->assertNotNull($transcription->error_message);
         }
-    }
-
-    #[Test]
-    public function it_uses_single_provider_when_fallback_disabled(): void
-    {
-        $storedPath = 'voice-uploads/test.webm';
-        Storage::disk('local')->put($storedPath, 'fake audio content');
-
-        $transcription = VoiceTranscription::create([
-            'user_id' => 1,
-            'provider' => 'openai',
-            'original_filename' => 'audio.webm',
-            'stored_path' => $storedPath,
-            'mime_type' => 'audio/webm',
-            'file_size' => 1024,
-            'status' => MessageStatus::PENDING,
-        ]);
-
-        $mockService = Mockery::mock(VoiceTranscriptionService::class);
-        $mockService->shouldReceive('transcribe')
-            ->once()
-            ->andReturn(new TranscriptionResponseDTO(
-                text: 'Test',
-                language: 'ru',
-                provider: 'openai',
-            ));
-
-        $job = new ProcessVoiceTranscriptionJob($transcription, false);
-        $job->handle($mockService);
-
-        $transcription->refresh();
-        $this->assertEquals('openai', $transcription->provider);
     }
 
     #[Test]
@@ -216,7 +183,7 @@ class ProcessVoiceTranscriptionJobTest extends TestCase
             'status' => MessageStatus::PROCESSING,
         ]);
 
-        $job = new ProcessVoiceTranscriptionJob($transcription, true);
+        $job = new ProcessVoiceTranscriptionJob($transcription);
         $job->failed(new \Exception('Test error'));
 
         $transcription->refresh();

@@ -8,6 +8,7 @@ use App\Enums\MessageStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Модель для отслеживания асинхронных транскрипций голоса.
@@ -29,7 +30,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
  */
-class VoiceTranscription extends Model
+final class VoiceTranscription extends Model
 {
     use HasUuids;
 
@@ -163,6 +164,8 @@ class VoiceTranscription extends Model
      */
     public function getFullStoredPath(): string
     {
-        return storage_path('app/'.$this->stored_path);
+        $disk = Storage::disk((string) config('voice.storage_disk', 'local'));
+
+        return $disk->path($this->stored_path);
     }
 }

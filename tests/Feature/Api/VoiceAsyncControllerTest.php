@@ -27,7 +27,6 @@ class VoiceAsyncControllerTest extends TestCase
 
     private function createAudioFile(string $name = 'audio.mp3'): UploadedFile
     {
-        // MP3 файл с минимальным валидным заголовком
         $mp3Header = hex2bin('fff3e464').str_repeat("\0", 100);
 
         return UploadedFile::fake()->createWithContent($name, $mp3Header);

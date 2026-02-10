@@ -6,7 +6,6 @@ namespace App\Jobs\Voice;
 
 use App\DTOs\Voice\TranscriptionRequestDTO;
 use App\Exceptions\VoiceTranscriptionException;
-use App\Jobs\Concerns\ProcessesVoiceTranscriptions;
 use App\Models\VoiceTranscription;
 use App\Services\Voice\VoiceTranscriptionService;
 use Illuminate\Bus\Queueable;
@@ -15,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Job для асинхронной транскрипции голосовых сообщений.
@@ -23,7 +23,6 @@ final class ProcessVoiceTranscriptionJob implements ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
-    use ProcessesVoiceTranscriptions;
     use Queueable;
     use SerializesModels;
 
@@ -34,14 +33,16 @@ final class ProcessVoiceTranscriptionJob implements ShouldQueue
     public function __construct(
         public readonly VoiceTranscription $transcription,
     ) {
-        $this->initializeVoiceJobConfig();
+        $this->tries = (int) config('ai.onboarding.job_tries', 3);
+        $this->backoff = (int) config('ai.onboarding.job_backoff', 10);
+        $this->onQueue((string) config('ai.onboarding.queue', 'onboarding'));
     }
 
     public function handle(VoiceTranscriptionService $service): void
     {
         $this->transcription->markAsProcessing();
 
-        Log::info('Processing voice transcription via queue', [
+        Log::info('Processing voice transcription', [
             'transcription_id' => $this->transcription->id,
             'user_id' => $this->transcription->user_id,
         ]);
@@ -63,16 +64,14 @@ final class ProcessVoiceTranscriptionJob implements ShouldQueue
                 duration: $response->duration,
             );
 
-            Log::info('Voice transcription completed via queue', [
+            Log::info('Voice transcription completed', [
                 'transcription_id' => $this->transcription->id,
-                'provider' => $response->provider,
                 'text_length' => strlen($response->text),
             ]);
         } catch (VoiceTranscriptionException $e) {
             $this->transcription->markAsFailed($e->getMessage());
             throw $e;
         } finally {
-            // Очищаем временный файл после обработки
             $this->cleanupTempFile($this->transcription->stored_path);
         }
     }
@@ -81,7 +80,7 @@ final class ProcessVoiceTranscriptionJob implements ShouldQueue
     {
         $error = $exception?->getMessage() ?? 'Unknown error';
 
-        Log::error('Failed to process voice transcription', [
+        Log::error('Voice transcription job failed', [
             'transcription_id' => $this->transcription->id,
             'user_id' => $this->transcription->user_id,
             'error' => $error,
@@ -89,5 +88,14 @@ final class ProcessVoiceTranscriptionJob implements ShouldQueue
 
         $this->transcription->markAsFailed($error);
         $this->cleanupTempFile($this->transcription->stored_path);
+    }
+
+    private function cleanupTempFile(string $path): void
+    {
+        $disk = Storage::disk((string) config('voice.storage_disk', 'local'));
+
+        if ($disk->exists($path)) {
+            $disk->delete($path);
+        }
     }
 }

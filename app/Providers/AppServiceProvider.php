@@ -8,7 +8,7 @@ use App\Contracts\AI\AIClientInterface;
 use App\Contracts\Onboarding\OnboardingServiceInterface;
 use App\Services\AI\AnythingLLMClient;
 use App\Services\Onboarding\OnboardingService;
-use App\Services\Voice\VoiceClientFactory;
+use App\Services\Voice\OpenAIVoiceClient;
 use App\Services\Voice\VoiceTranscriptionService;
 use Illuminate\Support\ServiceProvider;
 
@@ -33,7 +33,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(OnboardingServiceInterface::class, OnboardingService::class);
 
         $this->app->singleton(VoiceTranscriptionService::class, function () {
-            return new VoiceTranscriptionService(new VoiceClientFactory);
+            return new VoiceTranscriptionService(
+                client: new OpenAIVoiceClient(
+                    apiKey: (string) config('voice.openai.api_key', ''),
+                    model: (string) config('voice.openai.model', 'whisper-1'),
+                    timeout: (int) config('voice.openai.timeout', 60),
+                ),
+                defaultLanguage: (string) config('voice.default_language', 'ru'),
+                storagePath: (string) config('voice.storage_path', 'voice-uploads'),
+                storageDisk: (string) config('voice.storage_disk', 'local'),
+            );
         });
     }
 

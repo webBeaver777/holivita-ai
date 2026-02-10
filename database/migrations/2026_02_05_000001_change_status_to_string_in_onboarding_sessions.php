@@ -3,17 +3,24 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE onboarding_sessions MODIFY COLUMN status VARCHAR(20) DEFAULT 'in_progress'");
+        Schema::table('onboarding_sessions', function (Blueprint $table) {
+            $table->string('status', 20)->default('in_progress')->change();
+        });
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE onboarding_sessions MODIFY COLUMN status ENUM('in_progress', 'completed', 'cancelled', 'expired') DEFAULT 'in_progress'");
+        Schema::table('onboarding_sessions', function (Blueprint $table) {
+            $table->enum('status', ['in_progress', 'completed', 'cancelled', 'expired'])
+                ->default('in_progress')
+                ->change();
+        });
     }
 };
