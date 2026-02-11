@@ -1,0 +1,1536 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Holivita AI API",
+        "description": "API для онбординг-чата с AI-ассистентом, суммаризации и голосового ввода (OpenAI Whisper). Авторизация отключена для MVP — user_id передаётся вручную. Модули: Onboarding (синхронный и асинхронный чат), Summaries (суммаризации сессий), Voice (транскрипция аудио). Формат ответов: успех — {success: true, data: {...}}, ошибка — {success: false, error: \"...\"}.",
+        "contact": {
+            "name": "Holivita AI Team",
+            "email": "support@holivita.ai"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/api",
+            "description": "API сервер"
+        }
+    ],
+    "paths": {
+        "/onboarding/async/chat": {
+            "post": {
+                "tags": [
+                    "Onboarding Async"
+                ],
+                "summary": "Асинхронная отправка сообщения в чат онбординга",
+                "description": "Ставит сообщение пользователя в очередь для обработки AI-ассистентом. Ответ возвращается немедленно со статусом pending. Для получения результата используйте GET /onboarding/async/status. Если предыдущее сообщение ещё обрабатывается — возвращается ошибка 409. Если message пустое — инициирует начало онбординга.",
+                "operationId": "onboardingAsyncChat",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "user_id"
+                                ],
+                                "properties": {
+                                    "user_id": {
+                                        "description": "ID пользователя",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 1
+                                    },
+                                    "session_id": {
+                                        "description": "ID сессии (опционально, создаётся автоматически)",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "message": {
+                                        "description": "Текст сообщения. Если пустое — запускается приветствие ассистента.",
+                                        "type": "string",
+                                        "maxLength": 2000,
+                                        "example": "Меня зовут Иван",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Сообщение принято в обработку",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "session_id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "pending"
+                                                    ],
+                                                    "example": "pending"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Предыдущее сообщение ещё обрабатывается",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Предыдущее сообщение ещё обрабатывается."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации входных данных",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID обязателен."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/onboarding/async/status": {
+            "get": {
+                "tags": [
+                    "Onboarding Async"
+                ],
+                "summary": "Проверка статуса асинхронной обработки сообщения",
+                "description": "Возвращает текущий статус обработки последнего сообщения в сессии. Статусы: pending (в очереди), processing (обрабатывается), completed (готово — ответ в поле message), failed (ошибка — описание в поле error). Рекомендуется опрашивать с интервалом 1–2 секунды.",
+                "operationId": "onboardingAsyncStatus",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "description": "ID пользователя",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "session_id",
+                        "in": "query",
+                        "description": "ID сессии онбординга (UUID)",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "550e8400-e29b-41d4-a716-446655440000"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Статус обработки получен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "session_id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "pending",
+                                                        "processing",
+                                                        "completed",
+                                                        "failed"
+                                                    ],
+                                                    "example": "completed"
+                                                },
+                                                "message": {
+                                                    "description": "Ответ ассистента (только при status=completed)",
+                                                    "type": "string",
+                                                    "example": "Здравствуйте! Расскажите о себе.",
+                                                    "nullable": true
+                                                },
+                                                "error": {
+                                                    "description": "Описание ошибки (только при status=failed)",
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "completed": {
+                                                    "description": "true, если обработка завершена успешно",
+                                                    "type": "boolean",
+                                                    "example": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Сессия не найдена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Сессия не найдена."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Session ID должен быть валидным UUID."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/onboarding/validate-user": {
+            "post": {
+                "tags": [
+                    "Onboarding"
+                ],
+                "summary": "Валидация пользователя перед началом онбординга",
+                "description": "Проверяет, может ли пользователь начать новую сессию онбординга. Если у пользователя уже есть активная сессия — возвращается конфликт (409) с ID существующей сессии. Используйте этот эндпоинт перед вызовом /onboarding/chat для проверки доступности.",
+                "operationId": "validateUser",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "user_id"
+                                ],
+                                "properties": {
+                                    "user_id": {
+                                        "description": "ID пользователя",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Пользователь валиден, можно начинать онбординг",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID валиден"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "user_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "У пользователя уже есть активная сессия",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "У пользователя уже есть активная сессия."
+                                        },
+                                        "active_session_id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "example": "550e8400-e29b-41d4-a716-446655440000"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации входных данных",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID обязателен."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/onboarding/chat": {
+            "post": {
+                "tags": [
+                    "Onboarding"
+                ],
+                "summary": "Отправка сообщения в синхронный чат онбординга",
+                "description": "Отправляет сообщение пользователя AI-ассистенту и возвращает ответ синхронно. Если message пустое или не передано — инициирует начало онбординга (приветственное сообщение от ассистента). Если у пользователя нет активной сессии — она создаётся автоматически.",
+                "operationId": "onboardingChat",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "user_id"
+                                ],
+                                "properties": {
+                                    "user_id": {
+                                        "description": "ID пользователя",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 1
+                                    },
+                                    "session_id": {
+                                        "description": "ID сессии (опционально, создаётся автоматически)",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "message": {
+                                        "description": "Текст сообщения. Если пустое — запускается приветствие ассистента.",
+                                        "type": "string",
+                                        "maxLength": 2000,
+                                        "example": "Меня зовут Иван, мне 35 лет",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ответ ассистента получен успешно",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Здравствуйте! Расскажите о ваших целях здоровья."
+                                                },
+                                                "completed": {
+                                                    "description": "true, если ассистент считает онбординг завершённым",
+                                                    "type": "boolean",
+                                                    "example": false
+                                                },
+                                                "session_id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации входных данных",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID обязателен."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "AI-сервис временно недоступен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Не удалось получить ответ от ассистента. Попробуйте позже."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/onboarding/complete": {
+            "post": {
+                "tags": [
+                    "Onboarding"
+                ],
+                "summary": "Завершение онбординга и создание суммаризации",
+                "description": "Завершает указанную сессию онбординга. AI-ассистент анализирует всю историю диалога и формирует структурированную суммаризацию (JSON) с данными о пользователе. Сессия переходит в статус completed. После завершения суммаризация доступна через эндпоинты /summaries.",
+                "operationId": "onboardingComplete",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "user_id",
+                                    "session_id"
+                                ],
+                                "properties": {
+                                    "user_id": {
+                                        "description": "ID пользователя",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 1
+                                    },
+                                    "session_id": {
+                                        "description": "ID сессии онбординга",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Онбординг завершён, суммаризация создана",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "summary": {
+                                                    "description": "Структурированная суммаризация данных пользователя в формате JSON",
+                                                    "type": "object"
+                                                },
+                                                "session_id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Сессия не найдена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Сессия не найдена."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "AI-сервис временно недоступен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Не удалось создать суммаризацию. Попробуйте позже."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/onboarding/cancel": {
+            "post": {
+                "tags": [
+                    "Onboarding"
+                ],
+                "summary": "Отмена сессии онбординга",
+                "description": "Отменяет активную сессию онбординга пользователя. Если session_id не передан — отменяет текущую активную сессию. Сессия переходит в статус cancelled. Повторная отмена уже завершённой сессии возвращает ошибку 409.",
+                "operationId": "onboardingCancel",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "user_id"
+                                ],
+                                "properties": {
+                                    "user_id": {
+                                        "description": "ID пользователя",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 1
+                                    },
+                                    "session_id": {
+                                        "description": "ID сессии (опционально — если не указан, отменяется текущая активная сессия)",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Сессия успешно отменена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Сессия отменена."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "session_id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Активная сессия не найдена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Активная сессия не найдена."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Сессия уже завершена или отменена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Сессия уже завершена."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/onboarding/history": {
+            "get": {
+                "tags": [
+                    "Onboarding"
+                ],
+                "summary": "Получение истории чата онбординга",
+                "description": "Возвращает полную историю сообщений последней сессии онбординга пользователя. Включает сообщения как пользователя (user), так и ассистента (assistant). Если у пользователя нет сессий — возвращает пустой массив.",
+                "operationId": "onboardingHistory",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "description": "ID пользователя",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "История сообщений",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "messages": {
+                                                    "description": "Массив сообщений диалога",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "role": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "user",
+                                                                    "assistant"
+                                                                ],
+                                                                "example": "assistant"
+                                                            },
+                                                            "content": {
+                                                                "type": "string",
+                                                                "example": "Здравствуйте! Расскажите о себе."
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "session_id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "550e8400-e29b-41d4-a716-446655440000",
+                                                    "nullable": true
+                                                },
+                                                "is_completed": {
+                                                    "description": "true, если сессия завершена",
+                                                    "type": "boolean",
+                                                    "example": false
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID обязателен."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/summaries": {
+            "get": {
+                "tags": [
+                    "Summaries"
+                ],
+                "summary": "Список суммаризаций завершённых сессий",
+                "description": "Возвращает пагинированный список суммаризаций завершённых сессий онбординга. Можно фильтровать по user_id. Суммаризация содержит структурированные данные о пользователе, собранные в ходе онбординга. Сортировка по дате завершения (новые первые).",
+                "operationId": "summariesIndex",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "description": "Фильтр по ID пользователя (если не указан — возвращаются все суммаризации)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Количество элементов на страницу (от 1 до 100, по умолчанию 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15,
+                            "maximum": 100,
+                            "minimum": 1,
+                            "example": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Список суммаризаций с пагинацией",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "string",
+                                                                "format": "uuid",
+                                                                "example": "550e8400-e29b-41d4-a716-446655440000"
+                                                            },
+                                                            "user_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "summary": {
+                                                                "description": "Структурированная суммаризация данных пользователя",
+                                                                "type": "object"
+                                                            },
+                                                            "completed_at": {
+                                                                "type": "string",
+                                                                "format": "date-time",
+                                                                "example": "2026-02-10T12:00:00.000000Z"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time",
+                                                                "example": "2026-02-10T11:30:00.000000Z"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "pagination": {
+                                                    "properties": {
+                                                        "current_page": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "last_page": {
+                                                            "type": "integer",
+                                                            "example": 3
+                                                        },
+                                                        "per_page": {
+                                                            "type": "integer",
+                                                            "example": 15
+                                                        },
+                                                        "total": {
+                                                            "type": "integer",
+                                                            "example": 42
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/summaries/{sessionId}": {
+            "get": {
+                "tags": [
+                    "Summaries"
+                ],
+                "summary": "Получение суммаризации по ID сессии",
+                "description": "Возвращает суммаризацию конкретной завершённой сессии онбординга. Суммаризация содержит структурированные данные (JSON), собранные AI-ассистентом в ходе диалога с пользователем.",
+                "operationId": "summariesShow",
+                "parameters": [
+                    {
+                        "name": "sessionId",
+                        "in": "path",
+                        "description": "UUID сессии онбординга",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "550e8400-e29b-41d4-a716-446655440000"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Суммаризация найдена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                                                },
+                                                "user_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "summary": {
+                                                    "description": "Структурированная суммаризация данных пользователя",
+                                                    "type": "object"
+                                                },
+                                                "completed_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2026-02-10T12:00:00.000000Z"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2026-02-10T11:30:00.000000Z"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Суммаризация не найдена (сессия не существует или не завершена)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Суммаризация не найдена."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/voice/transcribe": {
+            "post": {
+                "tags": [
+                    "Voice"
+                ],
+                "summary": "Синхронная транскрипция аудио в текст",
+                "description": "Отправляет аудиофайл на транскрипцию через OpenAI Whisper API и возвращает распознанный текст синхронно. Поддерживаемые форматы: webm, wav, mp3, mp4, ogg, flac. Максимальный размер файла — 25 МБ. Если речь не распознана — возвращает пустой текст с сообщением.",
+                "operationId": "voiceTranscribe",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "audio",
+                                    "user_id"
+                                ],
+                                "properties": {
+                                    "audio": {
+                                        "description": "Аудиофайл (webm, wav, mp3, mp4, ogg, flac). Макс. 25 МБ.",
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "user_id": {
+                                        "description": "ID пользователя",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 1
+                                    },
+                                    "language": {
+                                        "description": "Код языка ISO 639-1 (по умолчанию: ru)",
+                                        "type": "string",
+                                        "maxLength": 2,
+                                        "example": "ru"
+                                    },
+                                    "session_id": {
+                                        "description": "ID сессии онбординга (опционально, для привязки к сессии)",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Транскрипция выполнена успешно",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "text": {
+                                                    "description": "Распознанный текст (пустая строка, если речь не распознана)",
+                                                    "type": "string",
+                                                    "example": "Меня зовут Иван, мне 35 лет"
+                                                },
+                                                "language": {
+                                                    "description": "Определённый язык аудио",
+                                                    "type": "string",
+                                                    "example": "ru"
+                                                },
+                                                "confidence": {
+                                                    "description": "Уровень уверенности распознавания (0–1)",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 0.95,
+                                                    "nullable": true
+                                                },
+                                                "duration": {
+                                                    "description": "Длительность аудио в секундах",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 3.5,
+                                                    "nullable": true
+                                                },
+                                                "provider": {
+                                                    "description": "Провайдер транскрипции",
+                                                    "type": "string",
+                                                    "example": "openai"
+                                                },
+                                                "message": {
+                                                    "description": "Сообщение (только если текст пустой)",
+                                                    "type": "string",
+                                                    "example": "Не удалось распознать речь. Попробуйте ещё раз."
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации (неверный формат, превышен размер и т.д.)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Аудио файл обязателен."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Сервис транскрипции недоступен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Сервис транскрипции временно недоступен."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/voice/status": {
+            "get": {
+                "tags": [
+                    "Voice"
+                ],
+                "summary": "Проверка доступности сервиса транскрипции",
+                "description": "Возвращает информацию о доступности сервиса голосовой транскрипции. Проверяет наличие API-ключа и работоспособность провайдера (OpenAI Whisper). Используйте перед отправкой аудио для проверки готовности сервиса.",
+                "operationId": "voiceStatus",
+                "responses": {
+                    "200": {
+                        "description": "Статус сервиса",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "available": {
+                                                    "description": "true, если сервис доступен и настроен",
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "provider": {
+                                                    "description": "Текущий провайдер транскрипции",
+                                                    "type": "string",
+                                                    "example": "openai"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/voice/async/transcribe": {
+            "post": {
+                "tags": [
+                    "Voice"
+                ],
+                "summary": "Асинхронная транскрипция аудио",
+                "description": "Отправляет аудиофайл в очередь для асинхронной транскрипции. Аудио сохраняется на диск, и задача ставится в очередь. Ответ возвращается немедленно с ID транскрипции и статусом pending. Для получения результата используйте GET /voice/async/status. Если предыдущая транскрипция ещё обрабатывается — возвращается ошибка 409.",
+                "operationId": "voiceAsyncTranscribe",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "audio",
+                                    "user_id"
+                                ],
+                                "properties": {
+                                    "audio": {
+                                        "description": "Аудиофайл (webm, wav, mp3, mp4, ogg, flac). Макс. 25 МБ.",
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "user_id": {
+                                        "description": "ID пользователя",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 1
+                                    },
+                                    "language": {
+                                        "description": "Код языка ISO 639-1 (по умолчанию: ru)",
+                                        "type": "string",
+                                        "maxLength": 2,
+                                        "example": "ru"
+                                    },
+                                    "session_id": {
+                                        "description": "ID сессии онбординга (опционально)",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Аудио принято в обработку",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "transcription_id": {
+                                                    "description": "ID транскрипции для отслеживания статуса",
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "660e8400-e29b-41d4-a716-446655440000"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "pending"
+                                                    ],
+                                                    "example": "pending"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Предыдущая транскрипция ещё обрабатывается",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Предыдущая транскрипция ещё обрабатывается."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Аудио файл обязателен."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/voice/async/status": {
+            "get": {
+                "tags": [
+                    "Voice"
+                ],
+                "summary": "Статус асинхронной транскрипции",
+                "description": "Возвращает текущий статус асинхронной транскрипции. Статусы: pending (в очереди), processing (обрабатывается), completed (готово — текст в поле text), failed (ошибка в поле error). При успешном завершении возвращаются также provider, confidence и duration. Рекомендуется опрашивать с интервалом 1–2 секунды.",
+                "operationId": "voiceAsyncStatus",
+                "parameters": [
+                    {
+                        "name": "transcription_id",
+                        "in": "query",
+                        "description": "UUID транскрипции, полученный при отправке аудио",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "660e8400-e29b-41d4-a716-446655440000"
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "description": "ID пользователя",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Статус транскрипции",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "transcription_id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "660e8400-e29b-41d4-a716-446655440000"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "pending",
+                                                        "processing",
+                                                        "completed",
+                                                        "failed"
+                                                    ],
+                                                    "example": "completed"
+                                                },
+                                                "completed": {
+                                                    "description": "true, если транскрипция завершена (успешно или с ошибкой)",
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "text": {
+                                                    "description": "Распознанный текст (только при status=completed)",
+                                                    "type": "string",
+                                                    "example": "Меня зовут Иван"
+                                                },
+                                                "provider": {
+                                                    "description": "Провайдер (только при status=completed)",
+                                                    "type": "string",
+                                                    "example": "openai"
+                                                },
+                                                "confidence": {
+                                                    "description": "Уверенность (только при status=completed)",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 0.95,
+                                                    "nullable": true
+                                                },
+                                                "duration": {
+                                                    "description": "Длительность аудио в секундах (только при status=completed)",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 3.5,
+                                                    "nullable": true
+                                                },
+                                                "message": {
+                                                    "description": "Сообщение при пустом тексте",
+                                                    "type": "string",
+                                                    "example": "Не удалось распознать речь. Попробуйте ещё раз."
+                                                },
+                                                "error": {
+                                                    "description": "Описание ошибки (только при status=failed)",
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Транскрипция не найдена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Транскрипция не найдена."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "ID транскрипции обязателен."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "SuccessResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "data": {
+                        "type": "object",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ErrorResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "error": {
+                        "type": "string",
+                        "example": "Описание ошибки"
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Onboarding",
+            "description": "Синхронный онбординг-чат с AI-ассистентом. Позволяет валидировать пользователя, вести диалог, завершать/отменять сессию и получать историю."
+        },
+        {
+            "name": "Onboarding Async",
+            "description": "Асинхронная обработка онбординга через очередь. Сообщения ставятся в очередь и обрабатываются фоновым воркером."
+        },
+        {
+            "name": "Summaries",
+            "description": "Суммаризации завершённых сессий онбординга. Содержат структурированные данные о пользователе."
+        },
+        {
+            "name": "Voice",
+            "description": "Голосовой ввод через OpenAI Whisper API. Поддерживает синхронную и асинхронную транскрипцию аудио в текст."
+        }
+    ]
+}
